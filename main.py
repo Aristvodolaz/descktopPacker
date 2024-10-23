@@ -58,6 +58,9 @@ class FileUploaderApp:
         # Загрузить список складов
         self.load_sklad_options()
 
+        # Переменная для контроля отмены
+        self.cancel_upload = False
+
     def load_sklad_options(self):
         """Запрос к серверу для получения списка складов и загрузка их в ComboBox."""
         try:
@@ -76,21 +79,46 @@ class FileUploaderApp:
             messagebox.showerror("Ошибка", f"Ошибка при подключении к серверу: {e}")
 
     def show_progress_window(self, max_value):
-        """Отображает окно прогресса."""
+        """Отображает окно прогресса с кнопкой отмены."""
         self.progress_window = tk.Toplevel(self.root)
         self.progress_window.title("Загрузка данных")
-        self.progress_window.geometry("300x100")
+        self.progress_window.geometry("300x150")
         self.progress_label = tk.Label(self.progress_window, text="Загрузка, пожалуйста, подождите...")
         self.progress_label.pack(pady=10)
         self.progress_bar = ttk.Progressbar(self.progress_window, length=250, mode='determinate', maximum=max_value)
         self.progress_bar.pack(pady=10)
+
+        # Кнопка "Отменить"
+        self.cancel_button = tk.Button(self.progress_window, text="Отменить", command=self.cancel_upload_process)
+        self.cancel_button.pack(pady=10)
+
         self.progress_window.transient(self.root)
         self.progress_window.grab_set()
+
+    def cancel_upload_process(self):
+        """Обрабатывает отмену загрузки и удаляет загруженные файлы на бэке."""
+        self.cancel_upload = True  # Флаг отмены загрузки
+        self.progress_window.destroy()
+        self.remove_uploaded_data()
 
     def update_progress(self, value):
         """Обновление прогресс-бара."""
         self.progress_bar['value'] = value
         self.progress_window.update()
+
+    def remove_uploaded_data(self):
+        """Удаляет ранее отправленные данные с сервера."""
+        try:
+            payload = {'pref': self.current_pref, 'Nazvanie_Zadaniya': self.current_task_name}
+            response = requests.post('https://corrywilliams.ru/delete-uploaded-data', json=payload)
+            if response.status_code == 200:
+                logging.info('Ранее отправленные данные успешно удалены.')
+            else:
+                logging.error(f'Ошибка при удалении данных: {response.text}')
+                messagebox.showerror("Ошибка", f"Ошибка при удалении данных: {response.text}")
+        except requests.RequestException as e:
+            logging.error(f'Ошибка при удалении данных: {e}')
+            messagebox.showerror("Ошибка", f"Ошибка при удалении данных: {e}")
 
     def upload_file(self):
         """Открывает диалог выбора файла, читает его и отправляет данные на сервер построчно."""
@@ -100,9 +128,8 @@ class FileUploaderApp:
 
         # Получаем имя файла без пути
         file_name = os.path.basename(file_path)
-
-        # Извлекаем pref до пробела в названии файла
-        pref = file_name.split(' ')[0]
+        self.current_task_name = file_name  # Сохраняем имя задания
+        self.current_pref = file_name.split(' ')[0]  # Сохраняем pref для отмены
 
         # Проверка, выбран ли склад
         selected_sklad = self.sklad_combobox.get()
@@ -132,6 +159,10 @@ class FileUploaderApp:
             # Подготовка данных для загрузки
             url = "https://corrywilliams.ru/upload-data"
             for index, row in data.iterrows():
+                if self.cancel_upload:  # Прекращение загрузки, если была нажата отмена
+                    logging.info('Загрузка была отменена пользователем.')
+                    break
+
                 # Преобразуем строку в JSON-совместимый формат, добавляем 'pref' в данные
                 payload = {
                     'Artikul': row.get('Артикул'),
@@ -167,7 +198,7 @@ class FileUploaderApp:
                     'Mesto': row.get('Место'),
                     'Vlozhennost': row.get('Вложенность'),
                     'Pallet_No': row.get('Паллет №'),
-                    'pref': pref,  # Передаем извлеченный pref
+                    'pref': self.current_pref,  # Передаем извлеченный pref
                     'Scklad_Pref': selected_sklad,  # Передаем склад
                     'Status': 0,
                     'Status_Zadaniya': 0,
@@ -180,22 +211,23 @@ class FileUploaderApp:
                 try:
                     response = requests.post(url, json=payload, timeout=30, verify=False)
 
-                    if response.status_code == 200:
-                        logging.info(f'Строка {index + 1} успешно загружена.')
-                    else:
+                    if response.status_code != 200:
                         logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text}')
                         messagebox.showerror("Ошибка", f"Ошибка при загрузке строки {index + 1}: {response.text}")
+                        break  # Останавливаем загрузку при ошибке
                 except requests.exceptions.RequestException as e:
                     logging.error(f'Ошибка при загрузке строки {index + 1}: {e}')
                     messagebox.showerror("Ошибка", f"Ошибка при загрузке строки {index + 1}: {e}")
+                    break  # Останавливаем загрузку при ошибке
 
                 # Обновляем прогресс
                 self.update_progress(index + 1)
                 time.sleep(0.2)
 
             # Закрываем окно прогресса после завершения
-            self.progress_window.destroy()
-            messagebox.showinfo("Успех", "Файл успешно загружен построчно.")
+            if not self.cancel_upload:  # Если загрузка не была отменена
+                self.progress_window.destroy()
+                messagebox.showinfo("Успех", "Файл успешно загружен!")
         except Exception as e:
             logging.error(f'Ошибка при загрузке файла: {e}')
             messagebox.showerror("Ошибка", f"Ошибка при загрузке файла: {e}")
@@ -229,19 +261,61 @@ class FileUploaderApp:
             return
 
         column_names = self.get_column_names()
+
         try:
             response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
             response.raise_for_status()
-            data = self.process_streaming_data(response)
 
-            if not data.empty:
-                self.save_to_excel(data, selected_task, column_names)
+            # Проверяем, связано ли задание с WB
+            if "WB" in selected_task:
+                # Обработка двух наборов данных для WB
+                json_data = response.json()
+                data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
+                data_set2 = pd.DataFrame(json_data.get('dataSet2', []))
+
+                # Проверяем, что хотя бы один из наборов содержит данные
+                if not data_set1.empty or not data_set2.empty:
+                    # Сохраняем данные в Excel на двух листах
+                    self.save_multiple_sheets_to_excel(data_set1, data_set2, selected_task, column_names)
+                else:
+                    messagebox.showwarning("Предупреждение", "Данные отсутствуют.")
             else:
-                messagebox.showwarning("Предупреждение", "Данные отсутствуют.")
+                # Обработка одного набора данных для других типов заданий
+                json_data = response.json()
+                data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
+                if not data_set1.empty:
+                    self.save_to_excel(data_set1, selected_task, column_names)
+                else:
+                    messagebox.showwarning("Предупреждение", "Данные отсутствуют.")
 
         except requests.RequestException as e:
             logging.error(f'Ошибка при скачивании файла: {e}')
             messagebox.showerror("Ошибка", f"Ошибка при скачивании файла: {e}")
+
+    def save_multiple_sheets_to_excel(self, data_set1, data_set2, task_name, column_names):
+        """Сохраняет два DataFrame в Excel файл на двух разных листах."""
+        # Переименовываем столбцы в обоих наборах данных
+        data_set1.rename(columns=column_names, inplace=True)
+        data_set2.rename(columns=column_names, inplace=True)
+
+        # Удаляем строки из dataSet1, где Pallet_No и SHK_WPS пусты или содержат только пробелы
+        data_set1 = data_set1[
+            ~((data_set1['Паллет №'].replace(r'^\s*$', None, regex=True).isnull()) &
+              (data_set1['ШК WPS'].replace(r'^\s*$', None, regex=True).isnull()))
+        ]
+
+        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'),
+                                      'Downloads')
+        local_file_path = os.path.join(downloads_path, f"{task_name}")
+
+        with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
+            # Записываем первый набор данных на первый лист
+            data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
+            # Записываем второй набор данных на второй лист
+            data_set2.to_excel(writer, sheet_name='Полный отчет', index=False)
+
+        messagebox.showinfo("Успех", f"Файл успешно скачан в {local_file_path}.")
+        logging.info(f'Файл {local_file_path} успешно скачан.')
 
     def get_column_names(self):
         """Возвращает словарь для переименования столбцов на русский."""
@@ -275,7 +349,7 @@ class FileUploaderApp:
         """Сохраняет DataFrame в Excel файл."""
         data.rename(columns=column_names, inplace=True)
         downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}.xlsx")
+        local_file_path = os.path.join(downloads_path, f"{task_name}")
         data.to_excel(local_file_path, index=False)
         messagebox.showinfo("Успех", f"Файл успешно скачан в {local_file_path}.")
         logging.info(f'Файл {local_file_path} успешно скачан.')
