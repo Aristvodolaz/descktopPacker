@@ -128,8 +128,9 @@ class FileUploaderApp:
 
         # Получаем имя файла без пути
         file_name = os.path.basename(file_path)
-        self.current_task_name = file_name  # Сохраняем имя задания
-        self.current_pref = file_name.split(' ')[0]  # Сохраняем pref для отмены
+
+        # Извлекаем pref до пробела в названии файла
+        pref = file_name.split(' ')[0]
 
         # Проверка, выбран ли склад
         selected_sklad = self.sklad_combobox.get()
@@ -148,25 +149,20 @@ class FileUploaderApp:
 
             # Замена NaN, пустых строк и некорректных значений на None
             data = data.where(pd.notnull(data), None)
-
-            # Замена всех типов данных float с 'NaN' и 'nan' на None с использованием NumPy
-            for column in data.columns:
-                data[column] = data[column].replace({np.nan: None, 'nan': None, 'NaN': None, '': None})
+            data = data.replace({np.nan: None, 'nan': None, 'NaN': None, '': None})
 
             # Отображение окна прогресса
             self.show_progress_window(len(data))
 
-            # Подготовка данных для загрузки
             url = "https://corrywilliams.ru/upload-data"
-            for index, row in data.iterrows():
-                if self.cancel_upload:  # Прекращение загрузки, если была нажата отмена
-                    logging.info('Загрузка была отменена пользователем.')
-                    break
 
-                # Преобразуем строку в JSON-совместимый формат, добавляем 'pref' в данные
+            # Обработка каждой строки
+            for index, row in data.iterrows():
+                artikul_syrya = str(int(row['Артикул Сырья'])) if pd.notna(row.get('Артикул Сырья')) else None
+
                 payload = {
                     'Artikul': row.get('Артикул'),
-                    'Artikul_Syrya': row.get('Артикул Сырья'),
+                    'Artikul_Syrya': artikul_syrya,  # Используем преобразованное значение
                     'Nomenklatura': row.get('Номенклатура'),
                     'Nazvanie_Tovara': row.get('Название товара'),
                     'SHK': row.get('ШК'),
@@ -198,36 +194,36 @@ class FileUploaderApp:
                     'Mesto': row.get('Место'),
                     'Vlozhennost': row.get('Вложенность'),
                     'Pallet_No': row.get('Паллет №'),
-                    'pref': self.current_pref,  # Передаем извлеченный pref
+                    'pref': pref,  # Передаем извлеченный pref
                     'Scklad_Pref': selected_sklad,  # Передаем склад
                     'Status': 0,
                     'Status_Zadaniya': 0,
                     'Nazvanie_Zadaniya': file_name
                 }
 
-                # Логирование отправляемой строки
-                logging.info(f'Отправка строки {index + 1}: {payload}')
+                # Пытаемся отправить строку на сервер до успешного завершения
+                success = False
+                while not success:
+                    try:
+                        response = requests.post(url, json=payload, timeout=75, verify=True)
+                        if response.status_code == 200:
+                            logging.info(f'Строка {index + 1} успешно загружена.')
+                            success = True  # Успешная отправка
+                        else:
+                            logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text}')
+                            time.sleep(2)  # Ожидание перед повтором
 
-                try:
-                    response = requests.post(url, json=payload, timeout=30, verify=False)
-
-                    if response.status_code != 200:
-                        logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text}')
-                        messagebox.showerror("Ошибка", f"Ошибка при загрузке строки {index + 1}: {response.text}")
-                        break  # Останавливаем загрузку при ошибке
-                except requests.exceptions.RequestException as e:
-                    logging.error(f'Ошибка при загрузке строки {index + 1}: {e}')
-                    messagebox.showerror("Ошибка", f"Ошибка при загрузке строки {index + 1}: {e}")
-                    break  # Останавливаем загрузку при ошибке
+                    except requests.exceptions.RequestException as e:
+                        logging.error(f'Ошибка при загрузке строки {index + 1}: {e}')
+                        time.sleep(2)  # Ожидание перед повтором
 
                 # Обновляем прогресс
                 self.update_progress(index + 1)
-                time.sleep(0.2)
+                time.sleep(0.5)
 
             # Закрываем окно прогресса после завершения
-            if not self.cancel_upload:  # Если загрузка не была отменена
-                self.progress_window.destroy()
-                messagebox.showinfo("Успех", "Файл успешно загружен!")
+            self.progress_window.destroy()
+            messagebox.showinfo("Успех", "Файл успешно загружен построчно.")
         except Exception as e:
             logging.error(f'Ошибка при загрузке файла: {e}')
             messagebox.showerror("Ошибка", f"Ошибка при загрузке файла: {e}")
@@ -254,10 +250,10 @@ class FileUploaderApp:
             self.files_listbox.insert(tk.END, "Нет выполненных задач")
 
     def download_file(self):
-        """Скачивает данные построчно с сервера и формирует Excel файл с русскими названиями столбцов."""
+        """Download data from the server and process for saving to Excel."""
         selected_task = self.files_listbox.get(tk.ACTIVE)
         if not selected_task:
-            messagebox.showwarning("Предупреждение", "Пожалуйста, выберите задание.")
+            messagebox.showwarning("Warning", "Please select a task.")
             return
 
         column_names = self.get_column_names()
@@ -266,93 +262,133 @@ class FileUploaderApp:
             response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
             response.raise_for_status()
 
-            # Проверяем, связано ли задание с WB
+            # Process WB-specific data
             if "WB" in selected_task:
-                # Обработка двух наборов данных для WB
                 json_data = response.json()
                 data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
                 data_set2 = pd.DataFrame(json_data.get('dataSet2', []))
 
-                # Проверяем, что хотя бы один из наборов содержит данные
-                if not data_set1.empty or not data_set2.empty:
-                    # Сохраняем данные в Excel на двух листах
+                # Check if data_set1 has required data
+                if not data_set1.empty:
+                    # Check column names before processing
+                    print("Columns in data_set1:", data_set1.columns.tolist())
+                    # Calculate full report
+                    data_set2 = self.calculate_full_report(data_set1, data_set2)
+
+                    # Save to Excel
                     self.save_multiple_sheets_to_excel(data_set1, data_set2, selected_task, column_names)
                 else:
-                    messagebox.showwarning("Предупреждение", "Данные отсутствуют.")
+                    messagebox.showwarning("Warning", "No data available.")
             else:
-                # Обработка одного набора данных для других типов заданий
+                # Handle non-WB tasks
                 json_data = response.json()
                 data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
                 if not data_set1.empty:
                     self.save_to_excel(data_set1, selected_task, column_names)
                 else:
-                    messagebox.showwarning("Предупреждение", "Данные отсутствуют.")
+                    messagebox.showwarning("Warning", "No data available.")
 
         except requests.RequestException as e:
-            logging.error(f'Ошибка при скачивании файла: {e}')
-            messagebox.showerror("Ошибка", f"Ошибка при скачивании файла: {e}")
+            logging.error(f'Error downloading file: {e}')
+            messagebox.showerror("Error", f"Error downloading file: {e}")
+
+    def standardize_column_names(self, df, name_mappings):
+        """Renames columns in a DataFrame based on a provided mapping."""
+        # Rename columns based on the mappings
+        for standard_name, possible_names in name_mappings.items():
+            for name in possible_names:
+                if name in df.columns:
+                    df.rename(columns={name: standard_name}, inplace=True)
+                    break  # Stop once a match is found
+
+    def calculate_full_report(self, sheet1, sheet2):
+        """Calculate and update the second sheet based on the first sheet's data."""
+
+        # Define mappings for standardized column names
+        column_mappings = {
+            'Artikul': ['Артикул', 'Artikul'],
+            'Kolvo_Tovarov': ['Kolvo_Tovarov', 'Количество товаров'],
+            'Pallet_No': ['Паллет №', 'Pallet_No'],
+            'Vlozhennost': ['Вложенность'],
+            'Mesto': ['Место']
+        }
+
+        # Standardize column names in both sheets
+        self.standardize_column_names(sheet1, column_mappings)
+        self.standardize_column_names(sheet2, column_mappings)
+
+        # Verify required columns in both sheets
+        required_columns = ['Artikul', 'Kolvo_Tovarov', 'Pallet_No']
+        missing_columns = [col for col in required_columns if col not in sheet1.columns]
+
+        if missing_columns:
+            logging.error(f"Missing columns in sheet1 after renaming: {missing_columns}")
+            messagebox.showerror("Error", f"Missing columns in sheet1: {missing_columns}")
+            return sheet2  # Return unmodified sheet2 if there are missing columns
+
+        # Group by standardized column names
+        grouped_data = sheet1.groupby(['Artikul', 'Kolvo_Tovarov', 'Pallet_No']).size().reset_index(
+            name='Количество записей')
+
+        new_rows = []
+        for _, row in grouped_data.iterrows():
+            arkt = row['Artikul']
+            kolvo = row['Kolvo_Tovarov']
+            mesto = row['Количество записей']
+            pallet = row['Pallet_No']
+
+            # Check for existing matches in standardized sheet2
+            matches = sheet2[(sheet2['Artikul'] == arkt) & (sheet2['Vlozhennost'] == kolvo)]
+            if not matches.empty:
+                # Update existing row
+                sheet2.loc[(sheet2['Artikul'] == arkt) & (sheet2['Vlozhennost'] == kolvo), ['Mesto', 'Pallet_No']] = [
+                    mesto, pallet]
+            else:
+                # Add new rows for unmatched items
+                matches_for_copy = sheet2[sheet2['Artikul'] == arkt]
+                if not matches_for_copy.empty:
+                    for _, match in matches_for_copy.iterrows():
+                        new_row = match.copy()
+                        new_row['Vlozhennost'] = kolvo
+                        new_row['Mesto'] = mesto
+                        new_row['Pallet_No'] = pallet
+                        new_rows.append(new_row)
+
+        # Append new rows if there are any
+        if new_rows:
+            sheet2 = pd.concat([sheet2, pd.DataFrame(new_rows)], ignore_index=True)
+        return sheet2
 
     def save_multiple_sheets_to_excel(self, data_set1, data_set2, task_name, column_names):
-        """Сохраняет два DataFrame в Excel файл на двух разных листах."""
-        # Переименовываем столбцы в обоих наборах данных
+        """Save two DataFrames into an Excel file on separate sheets."""
         data_set1.rename(columns=column_names, inplace=True)
         data_set2.rename(columns=column_names, inplace=True)
 
-        # Удаляем строки из dataSet1, где Pallet_No и SHK_WPS пусты или содержат только пробелы
-        data_set1 = data_set1[
-            ~((data_set1['Паллет №'].replace(r'^\s*$', None, regex=True).isnull()) &
-              (data_set1['ШК WPS'].replace(r'^\s*$', None, regex=True).isnull()))
-        ]
-
-        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'),
-                                      'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}")
+        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
+        local_file_path = os.path.join(downloads_path, f"{task_name}.xlsx")
 
         with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
-            # Записываем первый набор данных на первый лист
             data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
-            # Записываем второй набор данных на второй лист
             data_set2.to_excel(writer, sheet_name='Полный отчет', index=False)
 
-        messagebox.showinfo("Успех", f"Файл успешно скачан в {local_file_path}.")
-        logging.info(f'Файл {local_file_path} успешно скачан.')
+        messagebox.showinfo("Success", f"File saved to {local_file_path}.")
+        logging.info(f'File saved at {local_file_path}.')
 
     def get_column_names(self):
-        """Возвращает словарь для переименования столбцов на русский."""
+        """Return a dictionary for renaming columns to Russian."""
         return {
-            "Nazvanie_Zadaniya": "Название задания", "Artikul": "Артикул", "Artikul_Syrya": "Артикул сырья",
-            "Nazvanie_Tovara": "Название товара", "SHK": "ШК", "SHK_Syrya": "ШК сырья",
-            "Kol_vo_Syrya": "Количество сырья", "Itog_Zakaz": "Итог заказа", "Itog_MP": "Итог MП", "SOH": "СОХ",
-            "Srok_Godnosti": "Срок годности", "Op_1_Bl_1_Sht": "Оп 1 бл. 1 шт", "Op_2_Bl_2_Sht": "Оп 2 бл. 2 шт",
-            "Op_3_Bl_3_Sht": "Оп 3 бл. 3 шт", "Op_4_Bl_4_Sht": "Оп 4 бл. 4 шт", "Op_5_Bl_5_Sht": "Оп 5 бл. 5 шт",
-            "Op_6_Blis_6_10_Sht": "Оп 6 блис.6-10шт", "Op_7_Pereschyot": "Оп 7 пересчет",
-            "Op_9_Fasovka_Sborka": "Оп 9 фасовка/сборка", "Op_10_Markirovka_SHT": "Оп 10 Маркировка ШТ",
-            "Op_11_Markirovka_Prom": "Оп 11 маркировка пром", "Op_13_Markirovka_Fabr": "Оп 13 маркировка фабр",
-            "Op_14_TU_1_Sht": "Оп 14 ТУ 1шт", "Op_15_TU_2_Sht": "Оп 15 ТУ 2 шт", "Op_16_TU_3_5": "Оп 16 ТУ 3-5",
-            "Op_17_TU_6_8": "Оп 17 ТУ 6-8", "Op_468_Proverka_SHK": "Оп 468 проверка ШК", "Op_469_Spetsifikatsiya_TM": "Оп 469 Спецификация ТМ",
-            "Op_470_Dop_Upakovka": "Оп 470 доп упаковка", "Mesto": "Место", "Vlozhennost": "Вложенность", "Pallet_No": "Паллет №", "Ispolnitel": "Исполнитель",
-            "SHK_WPS": "ШК WPS"
+            "Nazvanie_Zadaniya": "Название задания", "Artikul": "Артикул", "Kolvo_Tovarov": "Количество товаров",
+            "Pallet_No": "Паллет №", "Mesto": "Место", "Vlozhennost": "Вложенность", "SHK_WPS": "ШК WPS"
         }
 
-    def process_streaming_data(self, response):
-        """Обрабатывает данные, поступающие из потока, и возвращает DataFrame."""
-        data = []
-        for line in response.iter_lines():
-            if line:
-                row = pd.read_json(StringIO(line.decode('utf-8')), lines=True)
-                data.append(row)
-        if data:
-            return pd.concat(data, ignore_index=True).fillna("")
-        return pd.DataFrame()
-
     def save_to_excel(self, data, task_name, column_names):
-        """Сохраняет DataFrame в Excel файл."""
+        """Save a DataFrame to an Excel file."""
         data.rename(columns=column_names, inplace=True)
         downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}")
+        local_file_path = os.path.join(downloads_path, f"{task_name}.xlsx")
         data.to_excel(local_file_path, index=False)
-        messagebox.showinfo("Успех", f"Файл успешно скачан в {local_file_path}.")
-        logging.info(f'Файл {local_file_path} успешно скачан.')
+        messagebox.showinfo("Success", f"File saved to {local_file_path}.")
+        logging.info(f'File saved at {local_file_path}.')
 
 
 # Запуск приложения
