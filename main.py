@@ -149,7 +149,11 @@ class FileUploaderApp:
 
             # Замена NaN, пустых строк и некорректных значений на None
             data = data.where(pd.notnull(data), None)
-            data = data.replace({np.nan: None, 'nan': None, 'NaN': None, '': None})
+            data = data.replace({np.nan: None, '': None, ' ': None})
+
+            # # Замена всех типов данных float с 'NaN' и 'nan' на None с использованием NumPy
+            # for column in data.columns:
+            #     data[column] = data[column].replace({np.nan: None, 'nan': None, 'NaN': None, '': None})
 
             # Отображение окна прогресса
             self.show_progress_window(len(data))
@@ -158,11 +162,18 @@ class FileUploaderApp:
 
             # Обработка каждой строки
             for index, row in data.iterrows():
-                artikul_syrya = str(int(row['Артикул Сырья'])) if pd.notna(row.get('Артикул Сырья')) else None
-
+                artikul_syrya_value = row.get('Артикул Сырья')
+                if pd.notna(artikul_syrya_value):
+                    # Проверяем, является ли значение числом с плавающей точкой
+                    if isinstance(artikul_syrya_value, float) and artikul_syrya_value.is_integer():
+                        artikul_syrya = str(int(artikul_syrya_value))  # Убираем .0 и преобразуем в строку
+                    else:
+                        artikul_syrya = str(artikul_syrya_value)  # Преобразуем в строку
+                else:
+                    artikul_syrya = None  # Если значение пустое, ставим None для отправки как NULL
                 payload = {
                     'Artikul': row.get('Артикул'),
-                    'Artikul_Syrya': artikul_syrya,  # Используем преобразованное значение
+                    'Artikul_Syrya': artikul_syrya,  # None если отсутствует
                     'Nomenklatura': row.get('Номенклатура'),
                     'Nazvanie_Tovara': row.get('Название товара'),
                     'SHK': row.get('ШК'),
@@ -173,29 +184,29 @@ class FileUploaderApp:
                     'SOH': row.get('СОХ'),
                     'Tip_Postavki': row.get('тип поставки'),
                     'Srok_Godnosti': row.get('Срок Годности'),
-                    'Op_1_Bl_1_Sht': row.get('Оп 1 бл. 1 шт'),
-                    'Op_2_Bl_2_Sht': row.get('Оп 2 бл.2 шт'),
-                    'Op_3_Bl_3_Sht': row.get('Оп 3 бл.3 шт'),
-                    'Op_4_Bl_4_Sht': row.get('Оп 4 бл.4шт'),
-                    'Op_5_Bl_5_Sht': row.get('Оп 5 бл.5 шт'),
-                    'Op_6_Blis_6_10_Sht': row.get('Оп 6 блис.6-10шт'),
-                    'Op_7_Pereschyot': row.get('Оп 7 пересчет'),
-                    'Op_9_Fasovka_Sborka': row.get('Оп 9 фасовка/сборка'),
-                    'Op_10_Markirovka_SHT': row.get('Оп 10 Маркировка ШТ'),
-                    'Op_11_Markirovka_Prom': row.get('Оп 11 маркировка пром'),
-                    'Op_13_Markirovka_Fabr': row.get('Оп 13 маркировка фабр'),
-                    'Op_14_TU_1_Sht': row.get('Оп 14 ТУ 1 шт'),
-                    'Op_15_TU_2_Sht': row.get('Оп 15 ТУ 2 шт'),
-                    'Op_16_TU_3_5': row.get('Оп 16 ТУ 3-5'),
-                    'Op_17_TU_6_8': row.get('Оп 17 ТУ 6-8'),
-                    'Op_468_Proverka_SHK': row.get('Оп 468 проверка ШК'),
-                    'Op_469_Spetsifikatsiya_TM': row.get('Оп 469 Спецификация ТМ'),
-                    'Op_470_Dop_Upakovka': row.get('Оп 470 доп упаковка'),
+                    'Op_1_Bl_1_Sht': row.get('Оп 1 бл. 1 шт') or None,
+                    'Op_2_Bl_2_Sht': row.get('Оп 2 бл.2 шт') or None,
+                    'Op_3_Bl_3_Sht': row.get('Оп 3 бл.3 шт') or None,
+                    'Op_4_Bl_4_Sht': row.get('Оп 4 бл.4шт') or None,
+                    'Op_5_Bl_5_Sht': row.get('Оп 5 бл.5 шт') or None,
+                    'Op_6_Blis_6_10_Sht': row.get('Оп 6 блис.6-10шт') or None,
+                    'Op_7_Pereschyot': 'V' if row.get('Оп 7 пересчет') == 'V' else None,
+                    'Op_9_Fasovka_Sborka': 'V' if row.get('Оп 9 фасовка/сборка') == 'V' else None,
+                    'Op_10_Markirovka_SHT': row.get('Оп 10 Маркировка ШТ') or None,
+                    'Op_11_Markirovka_Prom': row.get('Оп 11 маркировка пром') or None,
+                    'Op_13_Markirovka_Fabr': row.get('Оп 13 маркировка фабр') or None,
+                    'Op_14_TU_1_Sht': row.get('Оп 14 ТУ 1 шт') or None,
+                    'Op_15_TU_2_Sht': row.get('Оп 15 ТУ 2 шт') or None,
+                    'Op_16_TU_3_5': row.get('Оп 16 ТУ 3-5') or None,
+                    'Op_17_TU_6_8': row.get('Оп 17 ТУ 6-8') or None,
+                    'Op_468_Proverka_SHK': 'V' if row.get('Оп 468 проверка ШК') == 'V' else None,
+                    'Op_469_Spetsifikatsiya_TM': 'V' if row.get('Оп 469 Спецификация ТМ') == 'V' else None,
+                    'Op_470_Dop_Upakovka': row.get('Оп 470 доп упаковка') or None,
                     'Mesto': row.get('Место'),
                     'Vlozhennost': row.get('Вложенность'),
                     'Pallet_No': row.get('Паллет №'),
-                    'pref': pref,  # Передаем извлеченный pref
-                    'Scklad_Pref': selected_sklad,  # Передаем склад
+                    'pref': pref,
+                    'Scklad_Pref': selected_sklad,
                     'Status': 0,
                     'Status_Zadaniya': 0,
                     'Nazvanie_Zadaniya': file_name
@@ -208,6 +219,8 @@ class FileUploaderApp:
                         response = requests.post(url, json=payload, timeout=75, verify=True)
                         if response.status_code == 200:
                             logging.info(f'Строка {index + 1} успешно загружена.')
+                            logging.info(f'{payload}')
+
                             success = True  # Успешная отправка
                         else:
                             logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text}')
