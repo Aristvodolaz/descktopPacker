@@ -35,10 +35,30 @@ class FileUploaderApp:
         # Кнопка для загрузки файла
         self.upload_button = tk.Button(root, text="Загрузить файл", font=self.button_font, command=self.upload_file, bg='#4CAF50', fg='white', relief='raised', height=2, bd=1, activebackground='#66bb6a', activeforeground='white')
         self.upload_button.pack(pady=10, padx=20, fill=tk.X)
-
+        # Кнопка для списка выполняемых заданий
+        self.list_in_progress_button = tk.Button(root, text="Список выполняемых заданий", font=self.button_font,
+                                                 command=self.load_in_progress_tasks, bg='#1976D2', fg='white',
+                                                 relief='raised', height=2, bd=1, activebackground='#42a5f5',
+                                                 activeforeground='white')
+        self.list_in_progress_button.pack(pady=10, padx=20, fill=tk.X)
         # Кнопка для списка выполненных файлов
         self.list_files_button = tk.Button(root, text="Список выполненных", font=self.button_font, command=self.load_completed_tasks, bg='#1976D2', fg='white', relief='raised', height=2, bd=1, activebackground='#42a5f5', activeforeground='white')
         self.list_files_button.pack(pady=10, padx=20, fill=tk.X)
+
+        # Кнопка для списка загруженных файлов
+        self.list_uploaded_button = tk.Button(
+            root,
+            text="Список загруженных",
+            font=self.button_font,
+            bg='#FF5722',
+            fg='white',
+            relief='raised',
+            height=2,
+            bd=1,
+            activebackground='#FF7043',
+            activeforeground='white'
+        )
+        self.list_uploaded_button.pack(pady=10, padx=20, fill=tk.X)
 
         # Выпадающий список (ComboBox) для выбора склада
         self.sklad_label = tk.Label(root, text="Выберите склад:", font=self.label_font, bg='#f0f0f0', fg='#666666')
@@ -60,6 +80,34 @@ class FileUploaderApp:
 
         # Переменная для контроля отмены
         self.cancel_upload = False
+
+    def load_in_progress_tasks(self):
+        """Запрашивает список выполняемых заданий с сервера и отображает их в listbox."""
+        try:
+            response = requests.get('https://corrywilliams.ru/tasks-in-progress')
+            response.raise_for_status()
+            tasks = response.json().get('tasksInProgress', [])
+
+            if not tasks:
+                messagebox.showinfo("Информация", "Нет выполняемых заданий.")
+                return
+
+            # Обновляем содержимое listbox
+            self.files_listbox.delete(0, tk.END)
+
+            for task in tasks:
+                task_info = f"{task['Nazvanie_Zadaniya']} (Начало: {task['Time_Start']}) - Прогресс: {task['Progress']}%"
+                self.files_listbox.insert(tk.END, task_info)
+
+                # Прогресс бар
+                progress_bar = ttk.Progressbar(self.root, length=250, mode='determinate', maximum=100)
+                progress_bar.pack(pady=5, padx=20)
+                progress_bar['value'] = float(task['Progress'])
+
+        except requests.RequestException as e:
+            logging.error(f'Ошибка при загрузке списка выполняемых заданий: {e}')
+            messagebox.showerror("Ошибка", f"Ошибка при загрузке списка выполняемых заданий: {e}")
+
 
     def load_sklad_options(self):
         """Запрос к серверу для получения списка складов и загрузка их в ComboBox."""
@@ -120,6 +168,12 @@ class FileUploaderApp:
             logging.error(f'Ошибка при удалении данных: {e}')
             messagebox.showerror("Ошибка", f"Ошибка при удалении данных: {e}")
 
+    def process_op_column_value(self, value):
+        """Проверяет значение и заменяет его на 'V', если оно не пустое и не равно 'V'."""
+        if value and value.strip() != 'V':  # Если значение не пустое и не равно 'V'
+            return 'V'
+        return value  # Если значение пустое или равно 'V', возвращаем как есть
+
     def upload_file(self):
         """Открывает диалог выбора файла, читает его и отправляет данные на сервер построчно."""
         file_path = filedialog.askopenfilename(filetypes=[("Excel файлы", "*.xlsx")])
@@ -149,11 +203,11 @@ class FileUploaderApp:
 
             # Замена NaN, пустых строк и некорректных значений на None
             data = data.where(pd.notnull(data), None)
-            data = data.replace({np.nan: None, '': None, ' ': None})
+            # data = data.replace({np.nan: None, '': None, ' ': None})
 
             # # Замена всех типов данных float с 'NaN' и 'nan' на None с использованием NumPy
-            # for column in data.columns:
-            #     data[column] = data[column].replace({np.nan: None, 'nan': None, 'NaN': None, '': None})
+            for column in data.columns:
+                data[column] = data[column].replace({np.nan: None, 'nan': None, 'NaN': None, '': None, ' ': None, '  ': None,  '   ': None})
 
             # Отображение окна прогресса
             self.show_progress_window(len(data))
@@ -184,24 +238,24 @@ class FileUploaderApp:
                     'SOH': row.get('СОХ'),
                     'Tip_Postavki': row.get('тип поставки'),
                     'Srok_Godnosti': row.get('Срок Годности'),
-                    'Op_1_Bl_1_Sht': row.get('Оп 1 бл. 1 шт') or None,
-                    'Op_2_Bl_2_Sht': row.get('Оп 2 бл.2 шт') or None,
-                    'Op_3_Bl_3_Sht': row.get('Оп 3 бл.3 шт') or None,
-                    'Op_4_Bl_4_Sht': row.get('Оп 4 бл.4шт') or None,
-                    'Op_5_Bl_5_Sht': row.get('Оп 5 бл.5 шт') or None,
-                    'Op_6_Blis_6_10_Sht': row.get('Оп 6 блис.6-10шт') or None,
-                    'Op_7_Pereschyot': 'V' if row.get('Оп 7 пересчет') == 'V' else None,
-                    'Op_9_Fasovka_Sborka': 'V' if row.get('Оп 9 фасовка/сборка') == 'V' else None,
-                    'Op_10_Markirovka_SHT': row.get('Оп 10 Маркировка ШТ') or None,
-                    'Op_11_Markirovka_Prom': row.get('Оп 11 маркировка пром') or None,
-                    'Op_13_Markirovka_Fabr': row.get('Оп 13 маркировка фабр') or None,
-                    'Op_14_TU_1_Sht': row.get('Оп 14 ТУ 1 шт') or None,
-                    'Op_15_TU_2_Sht': row.get('Оп 15 ТУ 2 шт') or None,
-                    'Op_16_TU_3_5': row.get('Оп 16 ТУ 3-5') or None,
-                    'Op_17_TU_6_8': row.get('Оп 17 ТУ 6-8') or None,
-                    'Op_468_Proverka_SHK': 'V' if row.get('Оп 468 проверка ШК') == 'V' else None,
-                    'Op_469_Spetsifikatsiya_TM': 'V' if row.get('Оп 469 Спецификация ТМ') == 'V' else None,
-                    'Op_470_Dop_Upakovka': row.get('Оп 470 доп упаковка') or None,
+                    'Op_1_Bl_1_Sht': self.process_op_column_value(row.get('Оп 1 бл. 1 шт')),
+                    'Op_2_Bl_2_Sht': self.process_op_column_value(row.get('Оп 2 бл.2 шт')),
+                    'Op_3_Bl_3_Sht': self.process_op_column_value(row.get('Оп 3 бл.3 шт')),
+                    'Op_4_Bl_4_Sht': self.process_op_column_value(row.get('Оп 4 бл.4шт')),
+                    'Op_5_Bl_5_Sht': self.process_op_column_value(row.get('Оп 5 бл.5 шт')),
+                    'Op_6_Blis_6_10_Sht': self.process_op_column_value(row.get('Оп 6 блис.6-10шт')),
+                    'Op_7_Pereschyot': self.process_op_column_value(row.get('Оп 7 пересчет')),
+                    'Op_9_Fasovka_Sborka': self.process_op_column_value(row.get('Оп 9 фасовка/сборка')),
+                    'Op_10_Markirovka_SHT': self.process_op_column_value(row.get('Оп 10 Маркировка ШТ')),
+                    'Op_11_Markirovka_Prom': self.process_op_column_value(row.get('Оп 11 маркировка пром')),
+                    'Op_13_Markirovka_Fabr': self.process_op_column_value(row.get('Оп 13 маркировка фабр')),
+                    'Op_14_TU_1_Sht': self.process_op_column_value(row.get('Оп 14 ТУ 1 шт')),
+                    'Op_15_TU_2_Sht': self.process_op_column_value(row.get('Оп 15 ТУ 2 шт')),
+                    'Op_16_TU_3_5': self.process_op_column_value(row.get('Оп 16 ТУ 3-5')),
+                    'Op_17_TU_6_8': self.process_op_column_value(row.get('Оп 17 ТУ 6-8')),
+                    'Op_468_Proverka_SHK': self.process_op_column_value(row.get('Оп 468 проверка ШК')),
+                    'Op_469_Spetsifikatsiya_TM': self.process_op_column_value(row.get('Оп 469 Спецификация ТМ')),
+                    'Op_470_Dop_Upakovka': self.process_op_column_value(row.get('Оп 470 доп упаковка')),
                     'Mesto': row.get('Место'),
                     'Vlozhennost': row.get('Вложенность'),
                     'Pallet_No': row.get('Паллет №'),
@@ -232,7 +286,7 @@ class FileUploaderApp:
 
                 # Обновляем прогресс
                 self.update_progress(index + 1)
-                time.sleep(0.5)
+                time.sleep(0.2)
 
             # Закрываем окно прогресса после завершения
             self.progress_window.destroy()
@@ -315,7 +369,7 @@ class FileUploaderApp:
                     break  # Stop once a match is found
 
     def calculate_full_report(self, sheet1, sheet2):
-        """Calculate and update the second sheet based on the first sheet's data."""
+        """Calculate and update the second sheet based on the first sheet's data, then remove redundant rows."""
 
         # Define mappings for standardized column names
         column_mappings = {
@@ -370,20 +424,43 @@ class FileUploaderApp:
         # Append new rows if there are any
         if new_rows:
             sheet2 = pd.concat([sheet2, pd.DataFrame(new_rows)], ignore_index=True)
+
+        # Remove redundant rows: rows with empty Mesto, Vlozhennost, and Pallet_No
+        # if the same Artikul already has non-empty values
+        for artikul in sheet2['Artikul'].unique():
+            # Check if there are both filled and empty rows for this Artikul
+            rows_with_values = sheet2[(sheet2['Artikul'] == artikul) &
+                                      sheet2[['Mesto', 'Vlozhennost', 'Pallet_No']].notna().all(axis=1)]
+            rows_without_values = sheet2[(sheet2['Artikul'] == artikul) &
+                                         sheet2[['Mesto', 'Vlozhennost', 'Pallet_No']].isna().all(axis=1)]
+
+            # Drop rows without values if there are rows with values
+            if not rows_with_values.empty and not rows_without_values.empty:
+                sheet2.drop(rows_without_values.index, inplace=True)
+
         return sheet2
 
     def save_multiple_sheets_to_excel(self, data_set1, data_set2, task_name, column_names):
-        """Save two DataFrames into an Excel file on separate sheets."""
+        """Save two DataFrames into an Excel file on separate sheets, filtering out rows with missing data on the first sheet."""
+
+        # Переименуем столбцы для первого и второго листов
         data_set1.rename(columns=column_names, inplace=True)
         data_set2.rename(columns=column_names, inplace=True)
 
-        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}.xlsx")
+        # Удаляем строки на первом листе, где отсутствуют значения в "Количество товаров" и "Паллет №"
+        filtered_data_set1 = data_set1.dropna(subset=["Количество товаров", "Паллет №"])
 
+        # Определяем путь для сохранения файла
+        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'),
+                                      'Downloads')
+        local_file_path = os.path.join(downloads_path, f"{task_name}")
+
+        # Записываем данные в Excel с двумя листами
         with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
-            data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
+            filtered_data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
             data_set2.to_excel(writer, sheet_name='Полный отчет', index=False)
 
+        # Информация о завершении
         messagebox.showinfo("Success", f"File saved to {local_file_path}.")
         logging.info(f'File saved at {local_file_path}.')
 
