@@ -324,10 +324,27 @@ class FileUploaderApp(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке загруженных заданий: {e}")
 
     def process_op_column_value(self, value):
-        """Проверяет значение и заменяет его на 'V', если оно не пустое и не равно 'V'."""
-        if value is not None and str(value).strip() != 'V':  # Преобразуем в строку перед применением strip
-            return 'V'
-        return value  # Если значение пустое или равно 'V', возвращаем как есть
+        """
+        Обрабатывает значение ячейки:
+        - Если значение число, возвращает его как есть.
+        - Если значение равно 'V', возвращает 1.
+        - Если значение текст и не равно 'V', возвращает 'V'.
+        - Если значение пустое или None, возвращает None.
+        """
+        if value is not None:  # Если значение не пустое
+            value_str = str(value).strip()  # Преобразуем в строку и удаляем пробелы
+            if value_str.isdigit():  # Если это целое число
+                return int(value_str)  # Возвращаем как целое число
+            try:
+                # Если это число с плавающей точкой
+                float_value = float(value_str)
+                return float_value
+            except ValueError:
+                pass
+            if value_str == 'V':  # Если значение равно 'V'
+                return 1
+            return 'V'  # Если текст и не 'V', возвращаем 'V'
+        return value  # Если значение пустое, возвращаем как есть
 
     def cancel_upload_process(self):
         """Обрабатывает отмену загрузки и удаляет загруженные файлы на бэке."""
