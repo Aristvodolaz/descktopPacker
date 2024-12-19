@@ -334,15 +334,15 @@ class FileUploaderApp(QWidget):
         if value is not None:  # Если значение не пустое
             value_str = str(value).strip()  # Преобразуем в строку и удаляем пробелы
             if value_str.isdigit():  # Если это целое число
-                return int(value_str)  # Возвращаем как целое число
+                return str(value_str)  # Возвращаем как целое число
             try:
                 # Если это число с плавающей точкой
                 float_value = float(value_str)
-                return float_value
+                return str(float_value)
             except ValueError:
                 pass
             if value_str == 'V':  # Если значение равно 'V'
-                return 1
+                return '1'
             return 'V'  # Если текст и не 'V', возвращаем 'V'
         return value  # Если значение пустое, возвращаем как есть
 
@@ -459,11 +459,11 @@ class FileUploaderApp(QWidget):
 
                             success = True  # Успешная отправка
                         else:
-                            logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text}')
+                            logging.error(f'Ошибка при загрузке строки {index + 1}: {response.text} {payload}')
                             time.sleep(2)  # Ожидание перед повтором
 
                     except requests.exceptions.RequestException as e:
-                        logging.error(f'Ошибка при загрузке строки {index + 1}: {e}')
+                        logging.error(f'Ошибка при загрузке строки {index + 1}: {e} {response.text}')
                         time.sleep(2)  # Ожидание перед повтором
 
                 # Обновляем прогресс
