@@ -1,7 +1,7 @@
 import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QProgressBar, QComboBox, \
-    QLabel, QListWidget, QTabWidget, QFileDialog, QMessageBox, QListWidgetItem, QDialog
+    QLabel, QListWidget, QTabWidget, QFileDialog, QMessageBox, QListWidgetItem, QDialog, QLineEdit
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 import os
@@ -27,8 +27,8 @@ class FileUploaderApp(QWidget):
         self.setWindowTitle("Packer Desktop")
         self.setGeometry(100, 100, 900, 750)
         self.setStyleSheet("""
-            background-color: #ecf0f1;  # светлый фон
-            color: #2c3e50;  # темный текст для контраста
+            background-color: #ecf0f1;  
+            color: #2c3e50;  
             border-radius: 10px;
         """)
 
@@ -43,7 +43,7 @@ class FileUploaderApp(QWidget):
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
-            color: #2980b9;  # синий для заголовка
+            color: #2980b9;  
             font-size: 28px; 
             font-weight: bold;
         """)
@@ -135,49 +135,50 @@ class FileUploaderApp(QWidget):
             }
         """)
 
-        self.in_progress_tab = QWidget()
-        self.completed_tab = QWidget()
-        self.uploaded_tab = QWidget()
+        self.in_progress_tab = self.create_tab_with_search("Выполняемые")
+        self.completed_tab = self.create_tab_with_search("Завершенные")
+        self.uploaded_tab = self.create_tab_with_search("Загруженные")
 
-        self.tabs.addTab(self.in_progress_tab, "Выполняемые")
-        self.tabs.addTab(self.completed_tab, "Завершенные")
-        self.tabs.addTab(self.uploaded_tab, "Загруженные")
+        # Добавляем виджеты вкладок в QTabWidget
+        self.tabs.addTab(self.in_progress_tab["widget"], "Выполняемые")
+        self.tabs.addTab(self.completed_tab["widget"], "Завершенные")
+        self.tabs.addTab(self.uploaded_tab["widget"], "Загруженные")
 
         # Создаем лейауты для вкладок
-        self.in_progress_list = QListWidget()
+        # self.in_progress_list = QListWidget()
+        #
+        # self.in_progress_list.setStyleSheet("""
+        #     background-color: #ffffff;
+        #     color: #2c3e50;
+        #     padding: 2px;
+        #       border: none;
+        #     border-radius: 8px;
+        # """)
+        # self.in_progress_tab.setLayout(QVBoxLayout())
+        # self.in_progress_tab.layout().addWidget(self.in_progress_list)
 
-        self.in_progress_list.setStyleSheet("""
-            background-color: #ffffff;  
-            color: #2c3e50;  
-            padding: 2px; 
-              border: none;
-            border-radius: 8px;
-        """)
-        self.in_progress_tab.setLayout(QVBoxLayout())
-        self.in_progress_tab.layout().addWidget(self.in_progress_list)
-
-        self.completed_list = QListWidget()
-        self.completed_list.setStyleSheet("""
-            background-color: #ffffff;  
-            color: #2c3e50;  
-            padding: 2px; 
-            border: none;
-            border-radius: 8px;
-        """)
-        self.completed_tab.setLayout(QVBoxLayout())
-        self.completed_tab.layout().addWidget(self.completed_list)
-
-        self.uploaded_list = QListWidget()
-        self.uploaded_list.setStyleSheet("""
-            background-color: #ffffff;  
-            color: #2c3e50;  
-            padding: 2px; 
-              border: none;
-            border-radius: 8px;
-        """)
-
-        self.uploaded_tab.setLayout(QVBoxLayout())
-        self.uploaded_tab.layout().addWidget(self.uploaded_list)
+        # self.completed_list = QListWidget()
+        # self.completed_list.setStyleSheet("""
+        #     background-color: #ffffff;
+        #     color: #2c3e50;
+        #     padding: 2px;
+        #     border: none;
+        #     border-radius: 8px;
+        # """)
+        # self.completed_tab.setLayout(QVBoxLayout())
+        # self.completed_tab.layout().addWidget(self.completed_list)
+        #
+        # self.uploaded_list = QListWidget()
+        # self.uploaded_list.setStyleSheet("""
+        #     background-color: #ffffff;
+        #     color: #2c3e50;
+        #     padding: 2px;
+        #       border: none;
+        #     border-radius: 8px;
+        # """)
+        #
+        # self.uploaded_tab.setLayout(QVBoxLayout())
+        # self.uploaded_tab.layout().addWidget(self.uploaded_list)
 
         main_layout.addWidget(self.tabs)
 
@@ -205,6 +206,49 @@ class FileUploaderApp(QWidget):
         self.load_in_progress_tasks()
         self.cancel_upload = False
 
+    def init_expiry_tab(self):
+        """Инициализация вкладки для сроков годности."""
+        layout = QVBoxLayout()
+
+        # Поле для ввода артикула
+        self.artikul_input = QLineEdit()
+        self.artikul_input.setPlaceholderText("Введите артикул")
+        self.artikul_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #ffffff;
+                border: 1px solid #3498db;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 16px;
+            }
+        """)
+        layout.addWidget(self.artikul_input)
+
+        # Кнопка для поиска
+        self.search_button = QPushButton("Найти")
+        self.search_button.setStyleSheet("""
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+        """)
+        self.search_button.clicked.connect(self.fetch_expiry_data)
+        layout.addWidget(self.search_button)
+
+        # Список для отображения сроков годности
+        self.expiry_list = QListWidget()
+        self.expiry_list.setStyleSheet("""
+            background-color: #ffffff;
+            border: 1px solid #3498db;
+            border-radius: 5px;
+            padding: 5px;
+            font-size: 16px;
+        """)
+        layout.addWidget(self.expiry_list)
+
+        self.expiry_tab.setLayout(layout)
+
     # Кнопки
     def create_button(self, text, color):
         """Создает кнопку с плавной анимацией и стильной цветовой схемой."""
@@ -221,6 +265,39 @@ class FileUploaderApp(QWidget):
         button.setFixedHeight(50)
         return button
 
+    def create_tab_with_search(self, label):
+        """Создает вкладку с полем поиска и списком."""
+        tab_widget = QWidget()
+        tab_layout = QVBoxLayout()
+
+        # Добавляем поле для поиска
+        search_layout = QHBoxLayout()
+        search_input = QLineEdit()
+        search_input.setPlaceholderText(f"Поиск по названию в '{label}'")
+        search_button = QPushButton("Поиск")
+
+        search_layout.addWidget(search_input)
+        search_layout.addWidget(search_button)
+        tab_layout.addLayout(search_layout)
+
+        # Список заданий
+        task_list = QListWidget()
+        task_list.itemClicked.connect(self.on_completed_task_selected)  # Подключение сигнала
+        tab_layout.addWidget(task_list)
+
+        tab_widget.setLayout(tab_layout)
+
+        # Подключение функции поиска
+        search_button.clicked.connect(lambda: self.search_in_list(search_input, task_list))
+
+        return {"widget": tab_widget, "search_input": search_input, "task_list": task_list}
+
+    def search_in_list(self, search_input, task_list):
+        """Фильтрует список по введенному тексту."""
+        query = search_input.text().lower().strip()
+        for i in range(task_list.count()):
+            item = task_list.item(i)
+            item.setHidden(query not in item.text().lower())
 
     def load_sklad_options(self):
         """Запрос к серверу для получения списка складов и загрузка их в ComboBox."""
@@ -241,15 +318,46 @@ class FileUploaderApp(QWidget):
 
     def on_tab_change(self, index):
         """Обрабатывает смену вкладок."""
-        if index == 0:
-            logging.debug("Вкладка 'Выполняемые' выбрана")
-            self.load_in_progress_tasks()
-        elif index == 1:
-            logging.debug("Вкладка 'Завершенные' выбрана")
-            self.load_completed_tasks()
-        elif index == 2:
-            logging.debug("Вкладка 'Загруженные' выбрана")
-            self.load_uploaded_tasks()
+        try:
+            if index == 0:
+                logging.debug("Вкладка 'Выполняемые' выбрана")
+                self.load_in_progress_tasks()
+            elif index == 1:
+                logging.debug("Вкладка 'Завершенные' выбрана")
+                self.load_completed_tasks()
+            elif index == 2:
+                logging.debug("Вкладка 'Загруженные' выбрана")
+                self.load_uploaded_tasks()
+            elif index == 3:
+                logging.debug("Вкладка 'Срок годности' выбрана")
+                # Инициализация вкладки "Срок годности"
+                self.init_expiry_tab()
+        except Exception as e:
+            logging.error(f"Ошибка при переключении вкладки: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при переключении вкладки: {e}")
+
+    def fetch_expiry_data(self):
+        """Получение данных о сроках годности по артикулу."""
+        artikul = self.artikul_input.text().strip()
+        if not artikul:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, введите артикул.")
+            return
+
+        try:
+            response = requests.get(f'https://corrywilliams.ru/expiry-data?artikul={artikul}')
+            response.raise_for_status()
+            data = response.json().get('expiryData', [])
+
+            self.expiry_list.clear()
+            if data:
+                for item in data:
+                    expiry_info = f"Артикул: {item.get('Artikul', 'N/A')} \nСрок годности: {item.get('ExpiryDate', 'N/A')}"
+                    self.expiry_list.addItem(expiry_info)
+            else:
+                self.expiry_list.addItem("Нет данных для отображения.")
+        except requests.RequestException as e:
+            logging.error(f"Ошибка при получении данных о сроках годности: {e}")
+            QMessageBox.critical(self, "Ошибка", "Ошибка при подключении к серверу.")
 
     def update_task_list(self, list_widget, tasks):
         """Обновляет содержимое списка заданий."""
@@ -267,10 +375,11 @@ class FileUploaderApp(QWidget):
             response.raise_for_status()
             tasks_in_progress = response.json().get('tasksInProgress', [])
 
-            if tasks_in_progress:
-                # Clear the current list first
-                self.in_progress_list.clear()
+            # Получаем список задач из вкладки
+            task_list = self.in_progress_tab["task_list"]
+            task_list.clear()
 
+            if tasks_in_progress:
                 for task in tasks_in_progress:
                     task_name = task.get("Nazvanie_Zadaniya")
                     progress = float(task.get("Progress", 0))  # Convert progress to a float
@@ -282,17 +391,22 @@ class FileUploaderApp(QWidget):
                     list_item = QListWidgetItem(item)
 
                     # Adding the item to the list widget
-                    self.in_progress_list.addItem(list_item)
-
-                    # Optionally, you can also add a progress bar for each task here
-
-
+                    task_list.addItem(list_item)
             else:
-                self.in_progress_list.addItem("Нет выполняемых заданий.")
-
+                task_list.addItem("Нет выполняемых заданий.")
         except requests.RequestException as e:
             logging.error(f'Ошибка при загрузке выполняемых заданий: {e}')
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке выполняемых заданий: {e}")
+
+    def on_completed_task_selected(self, item):
+        try:
+            selected_task = item.text()
+            logging.debug(f"Выбранное задание: {selected_task}")
+            QMessageBox.information(self, "Выбор задания", f"Вы выбрали задание: {selected_task}")
+            self.download_file(selected_task)  # Передача задания для скачивания
+        except Exception as e:
+            logging.error(f"Ошибка в обработчике выбора задания: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {e}")
 
     def load_completed_tasks(self):
         """Запрашивает список выполненных заданий с сервера и обновляет список."""
@@ -300,7 +414,17 @@ class FileUploaderApp(QWidget):
             response = requests.get('https://corrywilliams.ru/completed-tasks')
             response.raise_for_status()
             tasks = response.json().get('tasks', [])
-            self.update_task_list(self.completed_list, tasks)
+
+            # Доступ к списку через словарь
+            task_list = self.completed_tab["task_list"]
+            task_list.clear()
+
+            if tasks:
+                for task in tasks:
+                    list_item = QListWidgetItem(task)  # Добавляем задание как текст
+                    task_list.addItem(list_item)
+            else:
+                task_list.addItem("Нет выполненных заданий.")
         except requests.RequestException as e:
             logging.error(f'Ошибка при загрузке выполненных заданий: {e}')
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке выполненных заданий: {e}")
@@ -318,7 +442,17 @@ class FileUploaderApp(QWidget):
             response = requests.get('https://corrywilliams.ru/uploaded-tasks')
             response.raise_for_status()
             tasks = response.json().get('tasks', [])
-            self.update_task_list(self.uploaded_list, tasks)
+
+            # Доступ к списку через словарь
+            task_list = self.uploaded_tab["task_list"]
+            task_list.clear()
+
+            if tasks:
+                for task in tasks:
+                    list_item = QListWidgetItem(task)
+                    task_list.addItem(list_item)
+            else:
+                task_list.addItem("Нет загруженных заданий.")
         except requests.RequestException as e:
             logging.error(f'Ошибка при загрузке загруженных заданий: {e}')
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке загруженных заданий: {e}")
@@ -333,17 +467,19 @@ class FileUploaderApp(QWidget):
         """
         if value is not None:  # Если значение не пустое
             value_str = str(value).strip()  # Преобразуем в строку и удаляем пробелы
-            if value_str.isdigit():  # Если это целое число
-                return str(value_str)  # Возвращаем как целое число
-            try:
-                # Если это число с плавающей точкой
-                float_value = float(value_str)
-                return str(float_value)
-            except ValueError:
-                pass
+
+            # Проверяем сначала конкретные значения
             if value_str == 'V':  # Если значение равно 'V'
-                return '1'
-            return 'V'  # Если текст и не 'V', возвращаем 'V'
+                return '1'  # Возвращаем '1'
+
+            try:
+                # Преобразуем значение в float и затем в целое число
+                float_value = float(value_str)
+                return str(int(float_value))  # Возвращаем целое число без точки
+            except ValueError:
+                # Если это не число, возвращаем 'V'
+                return 'V'
+
         return value  # Если значение пустое, возвращаем как есть
 
     def cancel_upload_process(self):
@@ -394,7 +530,7 @@ class FileUploaderApp(QWidget):
             self.progress_window = ProgressWindow(self, max_value=len(data))
             self.progress_window.show()
 
-            url = "https://corrywilliams.ru/upload-data"
+            url = "https://corrywilliams.ru/upload-data-new"
 
             # Обработка каждой строки
             for index, row in data.iterrows():
@@ -445,7 +581,18 @@ class FileUploaderApp(QWidget):
                     'Scklad_Pref': selected_sklad,
                     'Status': 0,
                     'Status_Zadaniya': 0,
-                    'Nazvanie_Zadaniya': file_name
+                    'Nazvanie_Zadaniya': file_name,
+                    'Sortiruemyi_Tovar': self.process_op_column_value(row.get('Сортируемый товар')),
+                    'Ne_Sortiruemyi_Tovar': self.process_op_column_value(row.get('Не сортируемый товар')),
+                    'Produkty': self.process_op_column_value(row.get('Продукты')),
+                    'Opasnyi_Tovar': self.process_op_column_value(row.get('Опасный товар')),
+                    'Zakrytaya_Zona': self.process_op_column_value(row.get('Закрытая зона')),
+                    'Krupnogabaritnyi_Tovar': self.process_op_column_value(row.get('Крупногабаритный товар')),
+                    'Yuvelirnye_Izdelia': self.process_op_column_value(row.get('Ювелирные изделия')),
+                    'Pechat_Etiketki_s_SHK': self.process_op_column_value(row.get('Печать этикетки с ШК')),
+                    'Pechat_Etiketki_s_Opisaniem': self.process_op_column_value(row.get('Печать этикетки с описанием')),
+                    'vp': row.get('ВП'),
+                    'Plan_Otkaz': row.get('Планируемое кол-во')
                 }
 
                 # Пытаемся отправить строку на сервер до успешного завершения
@@ -477,26 +624,34 @@ class FileUploaderApp(QWidget):
             logging.error(f'Ошибка при загрузке файла: {e}')
             messagebox.showerror("Ошибка", f"Ошибка при загрузке файла: {e}")
 
-    def download_file(self):
+    def download_file(self, task_name=None):
         """Download data from the server and process for saving to Excel."""
-
+        if not task_name:
+            QMessageBox.warning(self, "Ошибка", "Задание для скачивания не указано!")
+            return
         # Get the selected task from the QListWidget
-        selected_item = self.uploaded_list.curr
+        # Получаем выбранный элемент из вкладки "Завершенные"
+        selected_item = self.completed_tab["task_list"].currentItem()
 
-        # Debugging: print the selected item to verify it is correct
-        if selected_item:
-            print(f"Selected item: {selected_item.text()}")
-        else:
-            print("No item selected!")
-
-        if not selected_item:
-            QMessageBox.warning(self, "Warning", "Please select a task.")
+        if selected_item is None:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите задание!")
             return
 
-        selected_task = selected_item.text()  # Get the task name
+        if not selected_item:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите задание!")
+            return
+
+        # Получаем название задачи
+        selected_task = selected_item.text()
+
+        if not selected_task.strip():
+            QMessageBox.warning(self, "Ошибка", "Название задачи пустое или некорректное.")
+            return
+
+        logging.debug(f"Selected task: {selected_task}")
 
         # Debugging: confirm that the task is selected correctly
-        print(f"Selected task: {selected_task}")  # You can remove this once it works
+        # print(f"Selected task: {selected_task}")  # You can remove this once it works
 
         # Ensure there's actually a valid task selected
         if selected_task.strip() == "":
@@ -513,7 +668,8 @@ class FileUploaderApp(QWidget):
             # Check if the response is valid
             if response.status_code != 200:
                 logging.error(f"Failed to download file for task {selected_task}: {response.status_code}")
-                QMessageBox.showerror("Error", f"Failed to download the file. Server returned: {response.status_code}")
+                QMessageBox.critical(self, "Ошибка",
+                                     f"Не удалось загрузить файл. Сервер вернул: {response.status_code}")
                 return
 
             try:
@@ -648,71 +804,71 @@ class FileUploaderApp(QWidget):
         messagebox.showinfo("Успешно", f"Файл успешно сохранен {local_file_path}.")
         logging.info(f'File saved at {local_file_path}.')
 
-    def download_file(self):
-        """Download data from the server and process for saving to Excel."""
-
-        # Get the selected task from the QListWidget
-        selected_item = self.completed_list.currentItem()
-        if not selected_item:
-            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите задание!")
-            return
-        selected_task = selected_item.text()  # Get the task name
-
-        column_names = self.get_column_names()
-
-        try:
-            # Log the task being downloaded
-            logging.debug(f"Downloading data for task: {selected_task}")
-            response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
-
-            # Check if the response is valid
-            if response.status_code != 200:
-                logging.error(f"Failed to download file for task {selected_task}: {response.status_code}")
-                QMessageBox.showerror("Ошибка", f"Ошибка в загрузке файла: {response.status_code}")
-                return
-
-            try:
-                json_data = response.json()
-            except ValueError as e:
-                logging.error(f"Failed to parse JSON response: {e}")
-                QMessageBox.showerror("Ошибка",
-                                      "Ошибка получения ответа от сервера, проблема JSON формата")
-                return
-
-            # Process WB-specific data
-            if "WB" in selected_task:
-                data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
-                data_set2 = pd.DataFrame(json_data.get('dataSet2', []))
-
-                # Check if data_set1 has required data
-                if not data_set1.empty:
-                    # Verify required columns before processing
-                    required_columns = ['Artikul', 'Kolvo_Tovarov', 'Pallet_No']
-                    missing_columns = [col for col in required_columns if col not in data_set1.columns]
-                    if missing_columns:
-                        logging.error(f"Missing required columns in data_set1: {missing_columns}")
-                        QMessageBox.showerror("Error", f"Missing required columns in data_set1: {missing_columns}")
-                        return
-
-                    # Calculate full report
-                    data_set2 = self.calculate_full_report(data_set1, data_set2)
-
-                    # Save to Excel
-                    self.save_multiple_sheets_to_excel(data_set1, data_set2, selected_task, column_names)
-                else:
-                    QMessageBox.warning(self, "Warning", "No data available.")
-            else:
-                # Handle non-WB tasks
-                data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
-                if not data_set1.empty:
-                    self.save_to_excel(data_set1, selected_task, column_names)
-                else:
-                    QMessageBox.warning(self, "Warning", "No data available.")
-
-        except requests.RequestException as e:
-            logging.error(f'Error downloading file: {e}')
-            QMessageBox.showerror("Ошибка", f"Ошибка скачивания файла: {e}")
-
+    # def download_file(self):
+    #     """Download data from the server and process for saving to Excel."""
+    #
+    #     # Get the selected task from the QListWidget
+    #     selected_item = self.completed_list.currentItem()
+    #     if not selected_item:
+    #         QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите задание!")
+    #         return
+    #     selected_task = selected_item.text()  # Get the task name
+    #
+    #     column_names = self.get_column_names()
+    #
+    #     try:
+    #         # Log the task being downloaded
+    #         logging.debug(f"Downloading data for task: {selected_task}")
+    #         response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
+    #
+    #         # Check if the response is valid
+    #         if response.status_code != 200:
+    #             logging.error(f"Failed to download file for task {selected_task}: {response.status_code}")
+    #             QMessageBox.showerror("Ошибка", f"Ошибка в загрузке файла: {response.status_code}")
+    #             return
+    #
+    #         try:
+    #             json_data = response.json()
+    #         except ValueError as e:
+    #             logging.error(f"Failed to parse JSON response: {e}")
+    #             QMessageBox.showerror("Ошибка",
+    #                                   "Ошибка получения ответа от сервера, проблема JSON формата")
+    #             return
+    #
+    #         # Process WB-specific data
+    #         if "WB" in selected_task:
+    #             data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
+    #             data_set2 = pd.DataFrame(json_data.get('dataSet2', []))
+    #
+    #             # Check if data_set1 has required data
+    #             if not data_set1.empty:
+    #                 # Verify required columns before processing
+    #                 required_columns = ['Artikul', 'Kolvo_Tovarov', 'Pallet_No']
+    #                 missing_columns = [col for col in required_columns if col not in data_set1.columns]
+    #                 if missing_columns:
+    #                     logging.error(f"Missing required columns in data_set1: {missing_columns}")
+    #                     QMessageBox.showerror("Error", f"Missing required columns in data_set1: {missing_columns}")
+    #                     return
+    #
+    #                 # Calculate full report
+    #                 data_set2 = self.calculate_full_report(data_set1, data_set2)
+    #
+    #                 # Save to Excel
+    #                 self.save_multiple_sheets_to_excel(data_set1, data_set2, selected_task, column_names)
+    #             else:
+    #                 QMessageBox.warning(self, "Warning", "No data available.")
+    #         else:
+    #             # Handle non-WB tasks
+    #             data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
+    #             if not data_set1.empty:
+    #                 self.save_to_excel(data_set1, selected_task, column_names)
+    #             else:
+    #                 QMessageBox.warning(self, "Warning", "No data available.")
+    #
+    #     except requests.RequestException as e:
+    #         logging.error(f'Error downloading file: {e}')
+    #         QMessageBox.showerror("Ошибка", f"Ошибка скачивания файла: {e}")
+    #
     def save_multiple_sheets_to_excel(self, data_set1, data_set2, task_name, column_names):
         """Save two DataFrames into an Excel file on separate sheets, filtering out rows with missing data on the first sheet."""
 
