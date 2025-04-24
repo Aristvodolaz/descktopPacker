@@ -1,19 +1,14 @@
-import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QProgressBar, QComboBox, \
-    QLabel, QListWidget, QTabWidget, QFileDialog, QMessageBox, QListWidgetItem, QDialog, QLineEdit
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
+    QLabel, QListWidget, QTabWidget, QMessageBox, QListWidgetItem, QDialog, QLineEdit
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 import os
-import tkinter as tk
-from tkinter import filedialog, messagebox, font, ttk
+from tkinter import filedialog, messagebox
 import requests
 import pandas as pd
-import logging
-from io import StringIO
 import numpy as np
 import time
-# Настройка логирования
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -144,42 +139,6 @@ class FileUploaderApp(QWidget):
         self.tabs.addTab(self.completed_tab["widget"], "Завершенные")
         self.tabs.addTab(self.uploaded_tab["widget"], "Загруженные")
 
-        # Создаем лейауты для вкладок
-        # self.in_progress_list = QListWidget()
-        #
-        # self.in_progress_list.setStyleSheet("""
-        #     background-color: #ffffff;
-        #     color: #2c3e50;
-        #     padding: 2px;
-        #       border: none;
-        #     border-radius: 8px;
-        # """)
-        # self.in_progress_tab.setLayout(QVBoxLayout())
-        # self.in_progress_tab.layout().addWidget(self.in_progress_list)
-
-        # self.completed_list = QListWidget()
-        # self.completed_list.setStyleSheet("""
-        #     background-color: #ffffff;
-        #     color: #2c3e50;
-        #     padding: 2px;
-        #     border: none;
-        #     border-radius: 8px;
-        # """)
-        # self.completed_tab.setLayout(QVBoxLayout())
-        # self.completed_tab.layout().addWidget(self.completed_list)
-        #
-        # self.uploaded_list = QListWidget()
-        # self.uploaded_list.setStyleSheet("""
-        #     background-color: #ffffff;
-        #     color: #2c3e50;
-        #     padding: 2px;
-        #       border: none;
-        #     border-radius: 8px;
-        # """)
-        #
-        # self.uploaded_tab.setLayout(QVBoxLayout())
-        # self.uploaded_tab.layout().addWidget(self.uploaded_list)
-
         main_layout.addWidget(self.tabs)
 
         # Кнопка для загрузки файла
@@ -303,7 +262,7 @@ class FileUploaderApp(QWidget):
         """Запрос к серверу для получения списка складов и загрузка их в ComboBox."""
         try:
             logging.debug("Загружаем список складов...")
-            response = requests.get('https://corrywilliams.ru/sklads')
+            response = requests.get('http://10.171.12.36:3005/sklads')
             response.raise_for_status()  # Вызывает ошибку при неуспешном статусе
             sklads = response.json().get('sklads', [])
             if sklads:
@@ -344,7 +303,7 @@ class FileUploaderApp(QWidget):
             return
 
         try:
-            response = requests.get(f'https://corrywilliams.ru/expiry-data?artikul={artikul}')
+            response = requests.get(f'http://10.171.12.36:3005/expiry-data?artikul={artikul}')
             response.raise_for_status()
             data = response.json().get('expiryData', [])
 
@@ -371,7 +330,7 @@ class FileUploaderApp(QWidget):
     def load_in_progress_tasks(self):
         """Запрашивает список выполняемых заданий с сервера и обновляет список."""
         try:
-            response = requests.get('https://corrywilliams.ru/tasks-in-progress')
+            response = requests.get('http://10.171.12.36:3005/tasks-in-progress')
             response.raise_for_status()
             tasks_in_progress = response.json().get('tasksInProgress', [])
 
@@ -411,7 +370,7 @@ class FileUploaderApp(QWidget):
     def load_completed_tasks(self):
         """Запрашивает список выполненных заданий с сервера и обновляет список."""
         try:
-            response = requests.get('https://corrywilliams.ru/completed-tasks')
+            response = requests.get('http://10.171.12.36:3005/completed-tasks')
             response.raise_for_status()
             tasks = response.json().get('tasks', [])
 
@@ -430,16 +389,129 @@ class FileUploaderApp(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке выполненных заданий: {e}")
 
     def get_column_names(self):
-        """Return a dictionary for renaming columns to Russian."""
+
         return {
-            "Nazvanie_Zadaniya": "Название задания", "Artikul": "Артикул", "Kolvo_Tovarov": "Количество товаров",
-            "Pallet_No": "Паллет №", "Mesto": "Место", "Vlozhennost": "Вложенность", "SHK_WPS": "ШК WPS"
+            'Sortiruemyi_Tovar': 'Печать этикетки с ШК',
+            'Ne_Sortiruemyi_Tovar': 'Не сортируемый товар',
+            'Op_16_TU_3_5': 'Упаковка в пакет с клеевым слоем',
+            'Opasnyi_Tovar': 'Упаковка в пакет с замком Zip Lock',
+            'Zakrytaya_Zona': 'Упаковка в бабл - пленку',
+            'Op_1_Bl_1_Sht': 'Упаковка товара в индивидуальный короб',
+            'Op_2_Bl_2_Sht': 'Пересчет товара',
+            'Op_3_Bl_3_Sht': 'Фасовка/сборка монотовара в короб',
+            'Op_4_Bl_4_Sht': 'Маркировка товара стикером',
+            'Op_5_Bl_5_Sht': 'Маркировка транспортного короба',
+            'Op_6_Blis_6_10_Sht': 'Маркировка паллета (транспортного модуля)',
+            'Op_7_Pereschyot': 'Удаление стикера/маркировки с товара',
+            'Op_9_Fasovka_Sborka': 'Термоупаковка товара',
+            'Op_10_Markirovka_SHT': 'Разбор товара (для маркетплейсов)',
+            'Op_11_Markirovka_Prom': 'Подготовка транспортного паллета к отгрузке',
+            'Op_13_Markirovka_Fabr': 'Раскомплект заказа (полный/частичный)',
+            'Op_14_TU_1_Sht': 'Сортируемый товар',
+            'Op_15_TU_2_Sht': 'Не сортируемый товар',
+            'Produkty': 'Продукты',
+            'Op_17_TU_6_8': 'Опасный товар',
+            'Op_468_Proverka_SHK': 'Закрытая зона',
+            'Op_469_Spetsifikatsiya_TM': 'Спецификация ТМ (для маркетплейсов)',
+            'Op_470_Dop_Upakovka': 'Проверка штрих-кода / срока годности',
+            'Krupnogabaritnyi_Tovar': 'Крупногабаритный товар',
+            'Yuvelirnye_Izdelia': 'Ювелирные изделия',
+            'Upakovka_v_Gofro': 'Товар 18+',
+            'Upakovka_v_PE_Paket': 'Упаковка товара в п/э пакет',
+            'PriznakSortirovki': 'Сортировка товара по признаку',
+            'Nomenklatura': 'Номенклатура',
+            'Nazvanie_Zadaniya': 'Название задания',
+            'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
+            'Izmerenie_VGH_i_peredacha_informatsii': 'Измерение ВГХ и передача информации',
+            'Indeks_za_srochnost_koeff_1_5': 'Индекс за срочность (коэффициент 1,5)',
+            'Kompleksnaya_priemka_tovara': 'Комплексная приёмка товара',
+            'Priemka_tovara_v_transportnykh_korobakh': 'Приёмка товара в транспортных коробах',
+            'Priemka_tovara_palletnaya': 'Приёмка товара паллетная',
+            'Prochie_raboty_vklyuchaya_ustranenie_anomalii': 'Прочие работы (в т.ч. устранение аномалий)',
+            'Razbrakovka_tovara': 'Разбраковка товара',
+            'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов (комплектов) от 2-х штук разных товаров',
+            'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
+            'Khranenie_tovara': 'Хранение товара',
+            'Artikul': 'Артикул',
+            'Kolvo_Tovarov': 'Количество товаров',
+            'Pallet_No': 'Паллет №',
+            'Mesto': 'Место',
+            'Vlozhennost': 'Вложенность',
+            'SHK_WPS': 'ШК WPS'
+        }
+
+    def get_download_column_names(self):
+        return {
+            "vp": "ВП",
+            "Nazvanie_Zadaniya": "Название задания",
+            "Artikul": "Артикул",
+            "Artikul_Syrya": "Артикул Сырья",
+            "Nazvanie_Tovara": "Название товара",
+            "SHK": "ШК",
+            "SHK_Syrya": "ШК Сырья",
+            "Kol_vo_Syrya": "Кол-во сырья",
+            "Itog_Zakaz": "Итог Заказ",
+            "Itog_MP": "Итог МП",
+            "SOH": "СОХ",
+            "Srok_Godnosti": "Срок Годности",
+            'Sortiruemyi_Tovar': 'Печать этикетки с ШК',
+            'Ne_Sortiruemyi_Tovar': 'Не сортируемый товар',
+            "Opasnyi_Tovar": "Упаковка в пакет с замком Zip Lock",
+            "Zakrytaya_Zona": "Упаковка в бабл - пленку",
+            "Krupnogabaritnyi_Tovar": "Крупногабаритный товар",
+            "Yuvelirnye_Izdelia": "Ювелирные изделия",
+            "Fakticheskoe_Kol_vo": "Фактическое количество",
+            "Ubrano_iz_Zakaza": "Убрано из заказа",
+            "Op_1_Bl_1_Sht": "Упаковка товара в индивидуальный короб",
+            "Op_2_Bl_2_Sht": "Пересчет товара",
+            "Op_3_Bl_3_Sht": "Фасовка/сборка монотовара в короб",
+            "Op_4_Bl_4_Sht": "Маркировка товара стикером",
+            "Op_5_Bl_5_Sht": "Маркировка транспортного короба",
+            "Op_6_Blis_6_10_Sht": "Маркировка паллета (транспортного модуля)",
+            "Op_7_Pereschyot": "Удаление стикера/маркировки с товара",
+            "Op_9_Fasovka_Sborka": "Термоупаковка товара",
+            "Op_10_Markirovka_SHT": "Разбор товара (для маркетплейсов)",
+            "Op_11_Markirovka_Prom": "Подготовка транспортного паллета к отгрузке",
+            "Op_13_Markirovka_Fabr": "Раскомплект заказа (полный/частичный)",
+            "Op_14_TU_1_Sht": "Сортируемый товар",
+            "Op_15_TU_2_Sht": "Не сортируемый товар",
+            'Op_16_TU_3_5': 'Упаковка в пакет с клеевым слоем',
+            "Op_17_TU_6_8": "Опасный товар",
+            "Op_468_Proverka_SHK": "Закрытая зона",
+            "Op_469_Spetsifikatsiya_TM": "Спецификация ТМ",
+            "Op_470_Dop_Upakovka": "Проверка штрих-кода / срока годности",
+            "Pechat_Etiketki_s_SHK": "Печать этикетки с ШК",
+            "Pechat_Etiketki_s_Opisaniem": "Спецификация ТМ (для маркеплейсов)",
+            "Produkty": "Продукты",
+            "Upakovka_v_Gofro": "Товар 18+",
+            'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
+            'Izmerenie_VGH_i_peredacha_informatsii': 'Измерение ВГХ и передача информации',
+            'Indeks_za_srochnost_koeff_1_5': 'Индекс за срочность (коэффициент 1,5)',
+            'Kompleksnaya_priemka_tovara': 'Комплексная приёмка товара',
+            'Priemka_tovara_v_transportnykh_korobakh': 'Приёмка товара в транспортных коробах',
+            'Priemka_tovara_palletnaya': 'Приёмка товара паллетная',
+            'Prochie_raboty_vklyuchaya_ustranenie_anomalii': 'Прочие работы (в т.ч. устранение аномалий)',
+            'Razbrakovka_tovara': 'Разбраковка товара',
+            'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов (комплектов) от 2-х штук разных товаров',
+            'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
+            'Khranenie_tovara': 'Хранение товара',
+            'PriznakSortirovki': 'Сортировка товара по признаку',
+            'Mesto': 'Место',
+            'Vlozhennost': 'Вложенность',
+            "Pallet №": "Паллет №",
+            "Ispolnitel": "Исполнитель",
+            "SHK_WPS": "ШК WPS",
+            "reason": "Причина",
+            "comment": "Комментарий",
+            "Time_Start": "Начало",
+            "Time_End": "Окончание",
+
         }
 
     def load_uploaded_tasks(self):
         """Запрашивает список загруженных заданий с сервера и обновляет список."""
         try:
-            response = requests.get('https://corrywilliams.ru/uploaded-tasks')
+            response = requests.get('http://10.171.12.36:3005/uploaded-tasks')
             response.raise_for_status()
             tasks = response.json().get('tasks', [])
 
@@ -530,7 +602,7 @@ class FileUploaderApp(QWidget):
             self.progress_window = ProgressWindow(self, max_value=len(data))
             self.progress_window.show()
 
-            url = "https://corrywilliams.ru/upload-data-new"
+            url = "http://10.171.12.36:3005/upload-data-new"
 
             # Обработка каждой строки
             for index, row in data.iterrows():
@@ -545,7 +617,7 @@ class FileUploaderApp(QWidget):
                     artikul_syrya = None  # Если значение пустое, ставим None для отправки как NULL
                 payload = {
                     'Artikul': row.get('Артикул'),
-                    'Artikul_Syrya': artikul_syrya,  # None если отсутствует
+                    'Artikul_Syrya': artikul_syrya,
                     'Nomenklatura': row.get('Номенклатура'),
                     'Nazvanie_Tovara': row.get('Название товара'),
                     'SHK': row.get('ШК'),
@@ -556,24 +628,32 @@ class FileUploaderApp(QWidget):
                     'SOH': row.get('СОХ'),
                     'Tip_Postavki': row.get('тип поставки'),
                     'Srok_Godnosti': row.get('Срок Годности'),
-                    'Op_1_Bl_1_Sht': self.process_op_column_value(row.get('Оп 1 бл. 1 шт')),
-                    'Op_2_Bl_2_Sht': self.process_op_column_value(row.get('Оп 2 бл.2 шт')),
-                    'Op_3_Bl_3_Sht': self.process_op_column_value(row.get('Оп 3 бл.3 шт')),
-                    'Op_4_Bl_4_Sht': self.process_op_column_value(row.get('Оп 4 бл.4шт')),
-                    'Op_5_Bl_5_Sht': self.process_op_column_value(row.get('Оп 5 бл.5 шт')),
-                    'Op_6_Blis_6_10_Sht': self.process_op_column_value(row.get('Оп 6 блис.6-10шт')),
-                    'Op_7_Pereschyot': self.process_op_column_value(row.get('Оп 7 пересчет')),
-                    'Op_9_Fasovka_Sborka': self.process_op_column_value(row.get('Оп 9 фасовка/сборка')),
-                    'Op_10_Markirovka_SHT': self.process_op_column_value(row.get('Оп 10 Маркировка ШТ')),
-                    'Op_11_Markirovka_Prom': self.process_op_column_value(row.get('Оп 11 маркировка пром')),
-                    'Op_13_Markirovka_Fabr': self.process_op_column_value(row.get('Оп 13 маркировка фабр')),
-                    'Op_14_TU_1_Sht': self.process_op_column_value(row.get('Оп 14 ТУ 1 шт')),
-                    'Op_15_TU_2_Sht': self.process_op_column_value(row.get('Оп 15 ТУ 2 шт')),
-                    'Op_16_TU_3_5': self.process_op_column_value(row.get('Оп 16 ТУ 3-5')),
-                    'Op_17_TU_6_8': self.process_op_column_value(row.get('Оп 17 ТУ 6-8')),
-                    'Op_468_Proverka_SHK': self.process_op_column_value(row.get('Оп 468 проверка ШК')),
-                    'Op_469_Spetsifikatsiya_TM': self.process_op_column_value(row.get('Оп 469 Спецификация ТМ')),
-                    'Op_470_Dop_Upakovka': self.process_op_column_value(row.get('Оп 470 доп упаковка')),
+
+                    # Переименованные операции
+                    'Op_1_Bl_1_Sht': self.process_op_column_value(row.get('Упаковка товара в индивидуальный короб')),
+                    'Op_2_Bl_2_Sht': self.process_op_column_value(row.get('Пересчет товара')),
+                    'Op_3_Bl_3_Sht': self.process_op_column_value(row.get('Фасовка/сборка монотовара в короб')),
+                    'Op_4_Bl_4_Sht': self.process_op_column_value(row.get('Маркировка товара стикером')),
+                    'Op_5_Bl_5_Sht': self.process_op_column_value(row.get('Маркировка транспортного короба')),
+                    'Op_6_Blis_6_10_Sht': self.process_op_column_value(
+                        row.get('Маркировка паллета (транспортного модуля)')),
+                    'Op_7_Pereschyot': self.process_op_column_value(row.get('Удаление стикера/маркировки с товара')),
+                    'Op_9_Fasovka_Sborka': self.process_op_column_value(row.get('Термоупаковка товара')),
+                    'Op_10_Markirovka_SHT': self.process_op_column_value(row.get('Разбор товара (для маркетплейсов)')),
+                    'Op_11_Markirovka_Prom': self.process_op_column_value(
+                        row.get('Подготовка транспортного паллета к отгрузке')),
+                    'Op_13_Markirovka_Fabr': self.process_op_column_value(
+                        row.get('Раскомплект заказа (полный/частичный)')),
+                    'Op_14_TU_1_Sht': self.process_op_column_value(row.get('Сортируемый товар')),
+                    'Op_15_TU_2_Sht': self.process_op_column_value(row.get('Не сортируемый товар')),
+                    'Op_16_TU_3_5': self.process_op_column_value(row.get('Упаковка в пакет с клеевым слоем')),
+                    'Op_17_TU_6_8': self.process_op_column_value(row.get('Опасный товар')),
+                    'Op_468_Proverka_SHK': self.process_op_column_value(row.get('Закрытая зона')),
+                    'Op_469_Spetsifikatsiya_TM': self.process_op_column_value(
+                        row.get('Спецификация ТМ (для маркетплейсов)')),
+                    'Op_470_Dop_Upakovka': self.process_op_column_value(
+                        row.get('Проверка штрих-кода / срока годности')),
+
                     'Mesto': row.get('Место'),
                     'Vlozhennost': row.get('Вложенность'),
                     'Pallet_No': row.get('Паллет №'),
@@ -582,15 +662,40 @@ class FileUploaderApp(QWidget):
                     'Status': 0,
                     'Status_Zadaniya': 0,
                     'Nazvanie_Zadaniya': file_name,
-                    'Sortiruemyi_Tovar': self.process_op_column_value(row.get('Сортируемый товар')),
+                    'Upakovka_v_Gofro': self.process_op_column_value(row.get('Товар 18+')),
+                    'Upakovka_v_PE_Paket': self.process_op_column_value(row.get('Упаковка товара в п/э пакет')),
+                    # Переименованные признаки
+                    'Sortiruemyi_Tovar': self.process_op_column_value(row.get('Печать этикетки с ШК')),
                     'Ne_Sortiruemyi_Tovar': self.process_op_column_value(row.get('Не сортируемый товар')),
                     'Produkty': self.process_op_column_value(row.get('Продукты')),
-                    'Opasnyi_Tovar': self.process_op_column_value(row.get('Опасный товар')),
-                    'Zakrytaya_Zona': self.process_op_column_value(row.get('Закрытая зона')),
+                    'Opasnyi_Tovar': self.process_op_column_value(row.get('Упаковка в пакет с замком Zip Lock')),
+                    'Zakrytaya_Zona': self.process_op_column_value(row.get('Упаковка в бабл - пленку')),
                     'Krupnogabaritnyi_Tovar': self.process_op_column_value(row.get('Крупногабаритный товар')),
                     'Yuvelirnye_Izdelia': self.process_op_column_value(row.get('Ювелирные изделия')),
                     'Pechat_Etiketki_s_SHK': self.process_op_column_value(row.get('Печать этикетки с ШК')),
-                    'Pechat_Etiketki_s_Opisaniem': self.process_op_column_value(row.get('Печать этикетки с описанием')),
+                    # дубль — можно убрать
+                    'Pechat_Etiketki_s_Opisaniem': self.process_op_column_value(row.get('Спецификация ТМ (для маркеплейсов)')),
+                    # дубль — можно убрать
+                    'PriznakSortirovki': self.process_op_column_value(row.get('Сортировка товара по признаку')),
+                    'Vlozhit_v_upakovku_pechatnyi_material': self.process_op_column_value(
+                        row.get('Вложить в упаковку печатный материал')),
+                    'Izmerenie_VGH_i_peredacha_informatsii': self.process_op_column_value(
+                        row.get('Измерение ВГХ и передача информации')),
+                    'Indeks_za_srochnost_koeff_1_5': self.process_op_column_value(
+                        row.get('Индекс за срочность (коэффициент 1,5)')),
+                    'Kompleksnaya_priemka_tovara': self.process_op_column_value(row.get('Комплексная приёмка товара')),
+                    'Priemka_tovara_v_transportnykh_korobakh': self.process_op_column_value(
+                        row.get('Приёмка товара в транспортных коробах')),
+                    'Priemka_tovara_palletnaya': self.process_op_column_value(row.get('Приёмка товара паллетная')),
+                    'Prochie_raboty_vklyuchaya_ustranenie_anomalii': self.process_op_column_value(
+                        row.get('Прочие работы (в т.ч. устранение аномалий)')),
+                    'Razbrakovka_tovara': self.process_op_column_value(row.get('Разбраковка товара')),
+                    'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': self.process_op_column_value(
+                        row.get('Сборка наборов (комплектов) от 2-х штук разных товаров')),
+                    'Upakovka_tovara_v_gofromeyler': self.process_op_column_value(
+                        row.get('Упаковка товара в гофромейлер')),
+                    'Khranenie_tovara': self.process_op_column_value(row.get('Хранение товара')),
+
                     'vp': row.get('ВП'),
                     'Plan_Otkaz': row.get('Планируемое кол-во')
                 }
@@ -658,12 +763,12 @@ class FileUploaderApp(QWidget):
             QMessageBox.warning(self, "Warning", "The selected task is empty or invalid.")
             return
 
-        column_names = self.get_column_names()
+        column_names = self.get_download_column_names()
 
         try:
             # Log the task being downloaded
             logging.debug(f"Downloading data for task: {selected_task}")
-            response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
+            response = requests.get(f'http://10.171.12.36:3005/download?task={selected_task}', stream=True)
 
             # Check if the response is valid
             if response.status_code != 200:
@@ -797,101 +902,312 @@ class FileUploaderApp(QWidget):
 
     def save_to_excel(self, data, task_name, column_names):
         """Save a DataFrame to an Excel file."""
-        data.rename(columns=column_names, inplace=True)
-        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}")
-        data.to_excel(local_file_path, index=False)
-        messagebox.showinfo("Успешно", f"Файл успешно сохранен {local_file_path}.")
-        logging.info(f'File saved at {local_file_path}.')
+        try:
+            # Логгируем информацию о структуре данных для отладки
+            logging.info(f"Колонки в данных: {data.columns.tolist()}")
+            
+            # Переименуем колонки
+            data.rename(columns=column_names, inplace=True)
+            logging.info(f"Колонки после переименования: {data.columns.tolist()}")
+            
+            # Преобразуем ШК в текстовый формат
+            if 'ШК' in data.columns:
+                data['ШК'] = data['ШК'].astype(str)
+            
+            # Получаем информацию о времени работы
+            time_info = [
+                ["Информация о времени работы с заданием"],
+                ["Название задания:", task_name]
+            ]
+            
+            # Проверяем, есть ли колонки с датами (разные возможные имена)
+            time_start_col = None
+            time_end_col = None
+            
+            for col in data.columns:
+                if col.lower() in ['начало', 'time_start', 'time start']:
+                    time_start_col = col
+                elif col.lower() in ['окончание', 'time_end', 'time end']:
+                    time_end_col = col
+            
+            logging.info(f"Найдены колонки с датами: начало={time_start_col}, окончание={time_end_col}")
+            
+            if time_start_col and time_end_col:
+                # Проверяем формат дат и логгируем для отладки
+                sample_start = data[time_start_col].iloc[0] if not data[time_start_col].isna().all() else None
+                sample_end = data[time_end_col].iloc[0] if not data[time_end_col].isna().all() else None
+                logging.info(f"Примеры дат: начало={sample_start}, окончание={sample_end}")
+                
+                try:
+                    # Функция для преобразования российского формата даты "HH:MM:SS DD.MM.YYYY"
+                    def parse_russian_datetime(date_str):
+                        if pd.isna(date_str):
+                            return pd.NaT
+                        try:
+                            # Разделяем время и дату
+                            parts = date_str.strip().split()
+                            if len(parts) == 2:
+                                time_part, date_part = parts
+                                
+                                # Разбираем компоненты времени
+                                hours, minutes, seconds = map(int, time_part.split(':'))
+                                
+                                # Разбираем компоненты даты
+                                day, month, year = map(int, date_part.split('.'))
+                                
+                                return pd.Timestamp(year, month, day, hours, minutes, seconds)
+                            return pd.NaT
+                        except:
+                            return pd.NaT
+                    
+                    # Проверяем, содержат ли данные российский формат даты
+                    if sample_start and ':' in str(sample_start) and '.' in str(sample_start):
+                        # Применяем наш парсер
+                        data[time_start_col] = data[time_start_col].apply(parse_russian_datetime)
+                        data[time_end_col] = data[time_end_col].apply(parse_russian_datetime)
+                        logging.info("Применен парсер для российского формата даты")
+                    else:
+                        # Пробуем стандартные форматы дат
+                        date_formats = [
+                            '%m-%d-%Y %H:%M:%S',  # MM-DD-YYYY HH:MM:SS
+                            '%d-%m-%Y %H:%M:%S',  # DD-MM-YYYY HH:MM:SS
+                            '%Y-%m-%d %H:%M:%S',  # YYYY-MM-DD HH:MM:SS
+                            '%H:%M:%S %d.%m.%Y',  # HH:MM:SS DD.MM.YYYY
+                            '%d.%m.%Y %H:%M:%S'   # DD.MM.YYYY HH:MM:SS
+                        ]
+                        
+                        for date_format in date_formats:
+                            try:
+                                data[time_start_col] = pd.to_datetime(data[time_start_col], format=date_format, errors='coerce')
+                                data[time_end_col] = pd.to_datetime(data[time_end_col], format=date_format, errors='coerce')
+                                
+                                # Если даты успешно преобразованы, прерываем цикл
+                                if not data[time_start_col].isna().all() and not data[time_end_col].isna().all():
+                                    logging.info(f"Успешно преобразованы даты с форматом: {date_format}")
+                                    break
+                            except:
+                                continue
+                        
+                        # Если формат не подошел, пробуем без формата
+                        if data[time_start_col].isna().all() or data[time_end_col].isna().all():
+                            data[time_start_col] = pd.to_datetime(data[time_start_col], errors='coerce')
+                            data[time_end_col] = pd.to_datetime(data[time_end_col], errors='coerce')
+                            logging.info("Преобразование дат без формата")
+                    
+                    # Получаем минимальное и максимальное значение времени
+                    start_time = data[time_start_col].min()
+                    end_time = data[time_end_col].max()
+                    
+                    logging.info(f"Временные метки: начало={start_time}, окончание={end_time}")
+                    
+                    if pd.notna(start_time) and pd.notna(end_time):
+                        # Добавляем информацию о времени
+                        time_info.extend([
+                            ["Начало работы:", start_time.strftime("%d.%m.%Y %H:%M:%S")],
+                            ["Окончание работы:", end_time.strftime("%d.%m.%Y %H:%M:%S")],
+                            ["Общее время работы:", str(end_time - start_time)]
+                        ])
+                        logging.info("Успешно сформирована информация о времени")
+                    else:
+                        # Если не удалось определить даты, добавляем "Нет данных"
+                        time_info.extend([
+                            ["Начало работы:", "Нет данных"],
+                            ["Окончание работы:", "Нет данных"],
+                            ["Общее время работы:", "Нет данных"]
+                        ])
+                except Exception as e:
+                    logging.error(f"Ошибка при обработке дат: {e}")
+                    import traceback
+                    logging.error(traceback.format_exc())
+                    # В случае ошибки, добавляем "Нет данных"
+                    time_info.extend([
+                        ["Начало работы:", "Нет данных"],
+                        ["Окончание работы:", "Нет данных"],
+                        ["Общее время работы:", "Нет данных"]
+                    ])
+            else:
+                # Если колонки с датами не найдены
+                time_info.extend([
+                    ["Начало работы:", "Нет данных"],
+                    ["Окончание работы:", "Нет данных"],
+                    ["Общее время работы:", "Нет данных"]
+                ])
+            
+            # Удаляем строки, где Вложенность == 0 и reason пустой
+            if 'Вложенность' in data.columns and 'Причина' in data.columns:
+                # Преобразуем Вложенность в числовой формат для корректного сравнения
+                data['Вложенность'] = pd.to_numeric(data['Вложенность'], errors='coerce')
+                filtered_data = data[~((data['Вложенность'] == 0) & (
+                            data['Причина'].isna() | (data['Причина'].astype(str).str.strip() == '')))]
+                
+                if len(filtered_data) < len(data):
+                    logging.info(f"Отфильтровано {len(data) - len(filtered_data)} строк по условию Вложенность==0 и пустой Причине")
+                    data = filtered_data
+            
+            downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'), 'Downloads')
+            local_file_path = os.path.join(downloads_path, f"{task_name}")
+            
+            # Записываем данные в Excel
+            with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
+                # Записываем информацию о времени на отдельный лист (первым)
+                time_df = pd.DataFrame(time_info)
+                time_df.to_excel(writer, sheet_name='Время работы', index=False, header=False)
+                logging.info("Сохранен лист с информацией о времени")
+                
+                # Записываем основные данные
+                data = self.reorder_columns_by_template(data)
+                data.to_excel(writer, sheet_name='Отчет', index=False)
+                logging.info("Сохранен лист с данными")
+            
+            QMessageBox.information(self, "Успех", f"Файл успешно сохранен: {local_file_path}")
+            logging.info(f'Файл сохранен: {local_file_path}')
+            
+        except Exception as e:
+            logging.error(f"Ошибка при сохранении файла: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении файла: {e}")
 
-    # def download_file(self):
-    #     """Download data from the server and process for saving to Excel."""
-    #
-    #     # Get the selected task from the QListWidget
-    #     selected_item = self.completed_list.currentItem()
-    #     if not selected_item:
-    #         QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите задание!")
-    #         return
-    #     selected_task = selected_item.text()  # Get the task name
-    #
-    #     column_names = self.get_column_names()
-    #
-    #     try:
-    #         # Log the task being downloaded
-    #         logging.debug(f"Downloading data for task: {selected_task}")
-    #         response = requests.get(f'https://corrywilliams.ru/download?task={selected_task}', stream=True)
-    #
-    #         # Check if the response is valid
-    #         if response.status_code != 200:
-    #             logging.error(f"Failed to download file for task {selected_task}: {response.status_code}")
-    #             QMessageBox.showerror("Ошибка", f"Ошибка в загрузке файла: {response.status_code}")
-    #             return
-    #
-    #         try:
-    #             json_data = response.json()
-    #         except ValueError as e:
-    #             logging.error(f"Failed to parse JSON response: {e}")
-    #             QMessageBox.showerror("Ошибка",
-    #                                   "Ошибка получения ответа от сервера, проблема JSON формата")
-    #             return
-    #
-    #         # Process WB-specific data
-    #         if "WB" in selected_task:
-    #             data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
-    #             data_set2 = pd.DataFrame(json_data.get('dataSet2', []))
-    #
-    #             # Check if data_set1 has required data
-    #             if not data_set1.empty:
-    #                 # Verify required columns before processing
-    #                 required_columns = ['Artikul', 'Kolvo_Tovarov', 'Pallet_No']
-    #                 missing_columns = [col for col in required_columns if col not in data_set1.columns]
-    #                 if missing_columns:
-    #                     logging.error(f"Missing required columns in data_set1: {missing_columns}")
-    #                     QMessageBox.showerror("Error", f"Missing required columns in data_set1: {missing_columns}")
-    #                     return
-    #
-    #                 # Calculate full report
-    #                 data_set2 = self.calculate_full_report(data_set1, data_set2)
-    #
-    #                 # Save to Excel
-    #                 self.save_multiple_sheets_to_excel(data_set1, data_set2, selected_task, column_names)
-    #             else:
-    #                 QMessageBox.warning(self, "Warning", "No data available.")
-    #         else:
-    #             # Handle non-WB tasks
-    #             data_set1 = pd.DataFrame(json_data.get('dataSet1', []))
-    #             if not data_set1.empty:
-    #                 self.save_to_excel(data_set1, selected_task, column_names)
-    #             else:
-    #                 QMessageBox.warning(self, "Warning", "No data available.")
-    #
-    #     except requests.RequestException as e:
-    #         logging.error(f'Error downloading file: {e}')
-    #         QMessageBox.showerror("Ошибка", f"Ошибка скачивания файла: {e}")
-    #
+    def reorder_columns_by_template(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        desired_order = [
+            "Артикул", "Артикул Сырья", "Название товара", "ШК", "ШК Сырья", "Номенклатура", "Кол-во сырья",
+            "Итог Заказ",
+            "СОХ", "Срок Годности", "Упаковка в пакет с клеевым слоем", "Упаковка в пакет с замком Zip Lock",
+            "Упаковка товара в гофромейлер", "Упаковка товара в п/э пакет", "Упаковка в бабл - пленку",
+            "Упаковка товара в индивидуальный короб", "Пересчет товара", "Фасовка/сборка монотовара в короб",
+            "Маркировка товара стикером", "Маркировка транспортного короба",
+            "Маркировка паллета (транспортного модуля)",
+            "Удаление стикера/маркировки с товара", "Термоупаковка товара", "Проверка штрих-кода / срока годности",
+            "Спецификация ТМ (для маркеплейсов)", "Разбор товара (для маркетплейсов)",
+            "Подготовка транспортного паллета к отгрузке", "Раскомплект заказа (полный/частичный)",
+            "Сортировка товара по признаку", "Сборка наборов (комплектов) от 2-х штук разных товаров",
+            "Вложить в упаковку печатный материал", "Разбраковка товара", "Комплексная приёмка товара",
+            "Приёмка товара в транспортных коробах", "Приёмка товара паллетная", "Хранение товара",
+            "Измерение ВГХ и передача информации", "Индекс за срочность (коэффициент 1,5)",
+            "Прочие работы (в т.ч. устранение аномалий)", "Не сортируемый товар", "Товар 18+","Продукты", "Опасный товар",
+            "Закрытая зона",
+            "Крупногабаритный товар", "Ювелирные изделия", "Место", "Вложенность", "Pallet_No",
+        "Исполнитель", "Причина", "Комментарий", "Начало", "Окончание"
+
+
+        ]
+        for col in desired_order:
+            if col not in df.columns:
+                df[col] = None
+        return df[desired_order]
+
     def save_multiple_sheets_to_excel(self, data_set1, data_set2, task_name, column_names):
         """Save two DataFrames into an Excel file on separate sheets, filtering out rows with missing data on the first sheet."""
 
-        # Переименуем столбцы для первого и второго листов
-        data_set1.rename(columns=column_names, inplace=True)
-        data_set2.rename(columns=column_names, inplace=True)
+        try:
+            # Переименуем столбцы для первого и второго листов
+            data_set1.rename(columns=column_names, inplace=True)
+            data_set2.rename(columns=column_names, inplace=True)
 
-        # Удаляем строки на первом листе, где отсутствуют значения в "Количество товаров" и "Паллет №"
-        filtered_data_set1 = data_set1.dropna(subset=["Количество товаров", "Паллет №"])
+            # Преобразуем ШК в текстовый формат для обоих датафреймов
+            if 'ШК' in data_set1.columns:
+                data_set1['ШК'] = data_set1['ШК'].astype(str)
+            if 'ШК' in data_set2.columns:
+                data_set2['ШК'] = data_set2['ШК'].astype(str)
 
-        # Определяем путь для сохранения файла
-        downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'),
-                                      'Downloads')
-        local_file_path = os.path.join(downloads_path, f"{task_name}")
+            # Проверяем наличие необходимых колонок
+            required_columns = ["Kolvo_Tovarov", "Pallet_No"]
+            missing_columns = [col for col in required_columns if col not in data_set1.columns]
+            
+            if missing_columns:
+                logging.error(f"Отсутствуют необходимые колонки: {missing_columns}")
+                QMessageBox.warning(self, "Предупреждение", f"Отсутствуют необходимые колонки: {missing_columns}")
+                return
 
-        # Записываем данные в Excel с двумя листами
-        with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
-            filtered_data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
-            data_set2.to_excel(writer, sheet_name='Полный отчет', index=False)
+            # Удаляем строки на первом листе, где отсутствуют значения в "Количество товаров" и "Паллет №"
+            filtered_data_set1 = data_set1.dropna(subset=required_columns)
 
-        # Информация о завершении
-        messagebox.showinfo("Успешно", f"Файл сохранен {local_file_path}.")
-        logging.info(f'File saved at {local_file_path}.')
+            # Удаляем строки из полного отчета, где Вложенность == 0 и reason пустой
+            if 'Вложенность' in data_set2.columns and 'Причина' in data_set2.columns:
+                # Преобразуем Вложенность в числовой формат для корректного сравнения
+                data_set2['Вложенность'] = pd.to_numeric(data_set2['Вложенность'], errors='coerce')
+                data_set2 = data_set2[~((data_set2['Вложенность'] == 0) & (
+                            data_set2['Причина'].isna() | (data_set2['Причина'].astype(str).str.strip() == '')))]
+
+            # Создаем базовую информацию о времени работы
+            time_info = [
+                ["Информация о времени работы с заданием"],
+                ["Название задания:", task_name]
+            ]
+
+            # Проверяем, есть ли колонки с датами
+            time_start_col = None
+            time_end_col = None
+            
+            for col in data_set2.columns:
+                if col.lower() in ['начало', 'time_start', 'time start']:
+                    time_start_col = col
+                elif col.lower() in ['окончание', 'time_end', 'time end']:
+                    time_end_col = col
+                    
+            if time_start_col and time_end_col:
+                try:
+                    # Преобразуем время в datetime с правильным форматом
+                    data_set2[time_start_col] = pd.to_datetime(data_set2[time_start_col], format='%m-%d-%Y %H:%M:%S', errors='coerce')
+                    data_set2[time_end_col] = pd.to_datetime(data_set2[time_end_col], format='%m-%d-%Y %H:%M:%S', errors='coerce')
+                    
+                    start_time = data_set2[time_start_col].min()
+                    end_time = data_set2[time_end_col].max()
+                    
+                    if pd.notna(start_time) and pd.notna(end_time):
+                        # Добавляем информацию о времени, если удалось определить даты
+                        time_info.extend([
+                            ["Начало работы:", start_time.strftime("%d.%m.%Y %H:%M:%S")],
+                            ["Окончание работы:", end_time.strftime("%d.%m.%Y %H:%M:%S")],
+                            ["Общее время работы:", str(end_time - start_time)]
+                        ])
+                    else:
+                        # Если не удалось определить даты, добавляем "Нет данных"
+                        time_info.extend([
+                            ["Начало работы:", "Нет данных"],
+                            ["Окончание работы:", "Нет данных"],
+                            ["Общее время работы:", "Нет данных"]
+                        ])
+                except Exception as e:
+                    logging.error(f"Ошибка при обработке дат: {e}")
+                    # В случае ошибки, добавляем "Нет данных"
+                    time_info.extend([
+                        ["Начало работы:", "Нет данных"],
+                        ["Окончание работы:", "Нет данных"],
+                        ["Общее время работы:", "Нет данных"]
+                    ])
+            else:
+                # Если колонки с датами не найдены
+                time_info.extend([
+                    ["Начало работы:", "Нет данных"],
+                    ["Окончание работы:", "Нет данных"],
+                    ["Общее время работы:", "Нет данных"]
+                ])
+
+            # Определяем путь для сохранения файла
+            downloads_path = os.path.join(os.getenv('USERPROFILE') if os.name == 'nt' else os.path.expanduser('~'),
+                                          'Downloads')
+            local_file_path = os.path.join(downloads_path, f"{task_name}")
+
+            # Записываем данные в Excel с двумя листами
+            with pd.ExcelWriter(local_file_path, engine='xlsxwriter') as writer:
+                # Записываем информацию о времени на отдельный лист (первым)
+                time_df = pd.DataFrame(time_info)
+                time_df.to_excel(writer, sheet_name='Время работы', index=False, header=False)
+                logging.info("Сохранен лист с информацией о времени")
+                
+                filtered_data_set1.to_excel(writer, sheet_name='Краткий отчет', index=False)
+                data_set2 = self.reorder_columns_by_template(data_set2)
+                data_set2.to_excel(writer, sheet_name='Полный отчет', index=False)
+
+            # Информация о завершении
+            QMessageBox.information(self, "Успех", f"Файл успешно сохранен: {local_file_path}")
+            logging.info(f'Файл сохранен: {local_file_path}')
+
+        except Exception as e:
+            logging.error(f"Ошибка при сохранении файла: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении файла: {e}")
 
 
 
@@ -929,7 +1245,7 @@ class ProgressWindow(QDialog):
     def cancel_upload_process(self, pref, nazvanie):
 
 
-        url = "https://corrywilliams.ru/delete-uploaded-data"
+        url = "http://10.171.12.36:3005/delete-uploaded-data"
         data = {
             "pref": pref,
             "Nazvanie_Zadaniya": nazvanie
