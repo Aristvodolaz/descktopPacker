@@ -577,16 +577,14 @@ class FileUploaderApp(QWidget):
 
             # Замена NaN, пустых строк и некорректных значений на None
             data = data.where(pd.notnull(data), None)
-            # data = data.replace({np.nan: None, '': None, ' ': None})
 
-            # # Замена всех типов данных float с 'NaN' и 'nan' на None с использованием NumPy
+            # Замена всех типов данных float с 'NaN' и 'nan' на None с использованием NumPy
             for column in data.columns:
                 data[column] = data[column].replace(
                     {np.nan: None, 'nan': None, 'NaN': None, '': None, ' ': None, '  ': None, '   ': None})
 
             # Отображение окна прогресса
             print(len(data))
-            # self.progress_window = ProgressWindow(self, max_value=len(data))
             self.progress_window = ProgressWindow(self, max_value=len(data))
             self.progress_window.show()
 
@@ -603,6 +601,10 @@ class FileUploaderApp(QWidget):
                         artikul_syrya = str(artikul_syrya_value)  # Преобразуем в строку
                 else:
                     artikul_syrya = None  # Если значение пустое, ставим None для отправки как NULL
+
+                # Получаем значение для Upakovka_v_Gofro без обработки process_op_column_value
+                upakovka_v_gofro = str(row.get('Тип операции')) if pd.notna(row.get('Тип операции')) else None
+
                 payload = {
                     'Artikul': row.get('Артикул'),
                     'Artikul_Syrya': artikul_syrya,
@@ -648,7 +650,7 @@ class FileUploaderApp(QWidget):
                     'Status': 0,
                     'Status_Zadaniya': 0,
                     'Nazvanie_Zadaniya': file_name,
-                    'Upakovka_v_Gofro': self.process_op_column_value(row.get('Тип операции')),
+                    'Upakovka_v_Gofro': upakovka_v_gofro,  # Используем необработанное значение
                     'Upakovka_v_PE_Paket': self.process_op_column_value(row.get('Упаковка товара в п/э пакет')),
                     # Переименованные признаки
                     'Sortiruemyi_Tovar': self.process_op_column_value(row.get('Печать этикетки с ШК')),
@@ -659,9 +661,7 @@ class FileUploaderApp(QWidget):
                     'Krupnogabaritnyi_Tovar': self.process_op_column_value(row.get('Крупногабаритный товар')),
                     'Yuvelirnye_Izdelia': self.process_op_column_value(row.get('Ювелирные изделия')),
                     'Pechat_Etiketki_s_SHK': self.process_op_column_value(row.get('Печать этикетки с ШК')),
-                    # дубль — можно убрать
                     'Pechat_Etiketki_s_Opisaniem': self.process_op_column_value(row.get('Спецификация ТМ (для маркеплейсов)')),
-                    # дубль — можно убрать
                     'PriznakSortirovki': self.process_op_column_value(row.get('Сортируемый товар')),
                     'Vlozhit_v_upakovku_pechatnyi_material': self.process_op_column_value(
                         row.get('Вложить в упаковку печатный материал')),
