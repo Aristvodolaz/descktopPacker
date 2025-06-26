@@ -9,7 +9,7 @@ import {
   XMarkIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline'
-import { getWarehouses, uploadRowData } from '../utils/api'
+import { getWarehouses, uploadRowData, checkTaskExists } from '../utils/api'
 import { UploadData, UploadProgress } from '../types'
 import { processOpColumnValue, reverseUploadColumnMappings } from '../utils/columnMappings'
 import { processUploadedExcel } from '../utils/excelProcessor'
@@ -176,6 +176,15 @@ export default function Upload() {
     }
 
     try {
+      // Проверяем, существует ли уже задание с таким названием
+      const taskName = file.name
+      const taskExists = await checkTaskExists(taskName)
+      
+      if (taskExists) {
+        toast.error(`Задание "${taskName}" уже было загружено ранее. Повторная загрузка запрещена.`)
+        return
+      }
+
       const data = await processExcelData(file)
       
       setUploadProgress({
@@ -256,6 +265,12 @@ export default function Upload() {
         <p className="text-lg text-gray-600">
           Выберите склад и загрузите Excel файл для обработки. Завершенные задания можно скачать в виде Excel файлов с данными о времени работы.
         </p>
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Важно:</strong> Повторная загрузка файлов с одинаковыми названиями запрещена. 
+            Каждое задание может быть загружено только один раз.
+          </p>
+        </div>
       </motion.div>
 
       {/* Warehouse Selection */}

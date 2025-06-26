@@ -65,4 +65,15 @@ export const hideTask = async (taskName: string): Promise<void> => {
   })
 }
 
+// Check if task already exists
+export const checkTaskExists = async (taskName: string): Promise<boolean> => {
+  try {
+    const uploadedTasks = await getUploadedTasks()
+    return uploadedTasks.includes(taskName)
+  } catch (error) {
+    console.error('Error checking task existence:', error)
+    return false
+  }
+}
+
 export default api 
