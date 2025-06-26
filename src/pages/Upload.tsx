@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { getWarehouses, uploadRowData } from '../utils/api'
 import { UploadData, UploadProgress } from '../types'
-import { processOpColumnValue, uploadColumnMappings, reverseUploadColumnMappings } from '../utils/columnMappings'
+import { processOpColumnValue, reverseUploadColumnMappings } from '../utils/columnMappings'
 import { processUploadedExcel } from '../utils/excelProcessor'
 
 export default function Upload() {

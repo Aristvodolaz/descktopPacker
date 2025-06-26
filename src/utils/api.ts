@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Task, TaskInProgress, WarehouseOption, UploadData, ExpiryData, ApiResponse, DownloadData } from '../types'
+import { TaskInProgress, UploadData, ExpiryData, DownloadData } from '../types'
 
 const API_BASE_URL = '/api'
 

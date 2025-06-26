@@ -193,7 +193,7 @@ const reorderColumns = (data: any[]): any[] => {
 // Функция для автоподбора ширины колонок по максимальной длине текста
 function autosizeColumns(worksheet: XLSX.WorkSheet, data: any[], header: string[]) {
   const MAX_WIDTH = 40 // Максимальная ширина колонки в символах
-  const colWidths = header.map((col, i) => {
+  const colWidths = header.map((col, _) => {
     // Максимальная длина: заголовок или значение в строке
     let maxLen = (col ? String(col).length : 10)
     for (const row of data) {

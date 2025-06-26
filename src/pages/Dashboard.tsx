@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { motion } from 'framer-motion'
 import { usePagination } from '../utils/usePagination'
@@ -122,7 +121,7 @@ export default function Dashboard() {
         animate="visible"
         className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {stats.map((stat, index) => (
+        {stats.map((stat) => (
           <motion.div
             key={stat.name}
             variants={itemVariants}
