@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Modern web version of Packer Desktop application",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
