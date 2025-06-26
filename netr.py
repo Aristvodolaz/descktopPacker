@@ -568,15 +568,16 @@ class TaskManagerApp(QtWidgets.QWidget):
                     'Artikul': row.get('Артикул'),
                     'Nazvanie_Tovara': row.get('Название товара'),
                     'SHK': row.get('ШК'),
+                    'Nomenklatura': row.get('Номенклатура'),
                     'Itog_Zakaz': row.get('Итог Заказ'),
                     'Srok_Godnosti': row.get('Срок Годности'),
                     'pref': pref,
                     'Status': 0,
                     'Status_Zadaniya': 0,
                     'Nazvanie_Zadaniya': file_name,
-                    'vp': row.get('ВП')
+                    'vp': row.get('ВП'),
                 }
-
+                logging.debug(f"[{index + 1}/{len(data)}] Payload: {payload}")
                 success = False
                 while not success:
                     try:
@@ -662,6 +663,7 @@ class TaskManagerApp(QtWidgets.QWidget):
                 "shk_wps": "ШК ВПС",
                 "size_vps": "Размер ВПС",
                 "itog_zakaza": "Итог заказа",
+                "Nomenklatura": "Номенклатура"
             }
 
             df.rename(columns=column_mapping, inplace=True)

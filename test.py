@@ -456,24 +456,23 @@ class FileUploaderApp(QWidget):
             "Yuvelirnye_Izdelia": "Ювелирные изделия",
             "Fakticheskoe_Kol_vo": "Фактическое количество",
             "Ubrano_iz_Zakaza": "Убрано из заказа",
-            "Op_1_Bl_1_Sht": "Упаковка товара в индивидуальный короб",
-            "Op_2_Bl_2_Sht": "Пересчет товара",
-            "Op_3_Bl_3_Sht": "Фасовка/сборка монотовара в короб",
-            "Op_4_Bl_4_Sht": "Маркировка товара стикером",
-            "Op_5_Bl_5_Sht": "Маркировка транспортного короба",
+            'Op_1_Bl_1_Sht': 'Упаковка товара в индивидуальный короб',
+            'Op_2_Bl_2_Sht': 'Пересчет товара',
+            'Op_3_Bl_3_Sht': 'Фасовка/сборка монотовара в короб',
+            'Op_4_Bl_4_Sht': 'Маркировка товара стикером',
+            'Op_5_Bl_5_Sht': 'Маркировка транспортного короба',
             "Op_6_Blis_6_10_Sht": "Маркировка паллета (транспортного модуля)",
-            "Op_7_Pereschyot": "Удаление стикера/маркировки с товара",
-            "Op_9_Fasovka_Sborka": "Термоупаковка товара",
-            "Op_10_Markirovka_SHT": "Разбор товара (для маркетплейсов)",
-            "Op_11_Markirovka_Prom": "Подготовка транспортного паллета к отгрузке",
-            "Op_13_Markirovka_Fabr": "Раскомплект заказа (полный/частичный)",
+            'Op_7_Pereschyot': 'Удаление стикера/маркировки с товара',
+            'Op_9_Fasovka_Sborka': 'Термоупаковка товара',
+            'Op_10_Markirovka_SHT': 'Разбор товара (для маркетплейсов)',
+            'Op_11_Markirovka_Prom': 'Подготовка транспортного паллета к отгрузке',
+            'Op_13_Markirovka_Fabr': 'Раскомплект заказа (полный/частичный)',
             'Op_16_TU_3_5': 'Упаковка в пакет с клеевым слоем',
             "Op_17_TU_6_8": "Опасный товар",
             "Zakrytaya_Zona": "Закрытая зона",
-            "Op_469_Spetsifikatsiya_TM": "Спецификация ТМ",
             "Op_470_Dop_Upakovka": "Проверка штрих-кода / срока годности",
             "Pechat_Etiketki_s_SHK": "Печать этикетки с ШК",
-            "Pechat_Etiketki_s_Opisaniem": "Спецификация ТМ (для маркеплейсов)",
+            "Op_469_Spetsifikatsiya_TM": "Спецификация ТМ (для маркеплейсов)",
             "Produkty": "Продукты",
             "Upakovka_v_Gofro": "Тип операции",
             'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
@@ -619,7 +618,7 @@ class FileUploaderApp(QWidget):
                     'Tip_Postavki': row.get('тип поставки'),
                     'Srok_Godnosti': row.get('Срок Годности'),
 
-                    # Переименованные операции
+                    # Операции
                     'Op_1_Bl_1_Sht': self.process_op_column_value(row.get('Упаковка товара в индивидуальный короб')),
                     'Op_2_Bl_2_Sht': self.process_op_column_value(row.get('Пересчет товара')),
                     'Op_3_Bl_3_Sht': self.process_op_column_value(row.get('Фасовка/сборка монотовара в короб')),
@@ -637,8 +636,7 @@ class FileUploaderApp(QWidget):
                     'Op_16_TU_3_5': self.process_op_column_value(row.get('Упаковка в пакет с клеевым слоем')),
                     'Op_17_TU_6_8': self.process_op_column_value(row.get('Опасный товар')),
                     'Zakrytaya_Zona': self.process_op_column_value(row.get('Закрытая зона')),
-                    'Op_469_Spetsifikatsiya_TM': self.process_op_column_value(
-                        row.get('Спецификация ТМ (для маркетплейсов)')),
+
                     'Op_470_Dop_Upakovka': self.process_op_column_value(
                         row.get('Проверка штрих-кода / срока годности')),
 
@@ -661,7 +659,7 @@ class FileUploaderApp(QWidget):
                     'Krupnogabaritnyi_Tovar': self.process_op_column_value(row.get('Крупногабаритный товар')),
                     'Yuvelirnye_Izdelia': self.process_op_column_value(row.get('Ювелирные изделия')),
                     'Pechat_Etiketki_s_SHK': self.process_op_column_value(row.get('Печать этикетки с ШК')),
-                    'Pechat_Etiketki_s_Opisaniem': self.process_op_column_value(row.get('Спецификация ТМ (для маркеплейсов)')),
+                    'Op_469_Spetsifikatsiya_TM': self.process_op_column_value(row.get('Спецификация ТМ (для маркеплейсов)')),
                     'PriznakSortirovki': self.process_op_column_value(row.get('Сортируемый товар')),
                     'Vlozhit_v_upakovku_pechatnyi_material': self.process_op_column_value(
                         row.get('Вложить в упаковку печатный материал')),
