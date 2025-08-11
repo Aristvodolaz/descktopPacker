@@ -45,9 +45,18 @@ export default function Upload() {
         'Pechat_Etiketki_s_Opisaniem',
         'Kompleksnaya_priemka_tovara',
         'Priemka_tovara_v_transportnykh_korobkakh',
+        'Priemka_tovara_v_transportnykh_korobakh', // вариант без h в конце
         'Priemka_tovara_palletnaya',
         'Razbrakovka_tovara',
-        'Sortiruemyi_Tovar'
+        'Sortiruemyi_Tovar',
+        // Дополнительные колонки для исключения
+        'Ne_Sortiruemyi_Tovar',
+        'Produkty',
+        'Opasnyi_Tovar',
+        'Zakrytaya_Zona',
+        'Krupnogabaritnyi_Tovar',
+        'Yuvelirnye_Izdelia',
+        'PriznakSortirovki'
       ]
       
       // Преобразуем данные в нужный формат
