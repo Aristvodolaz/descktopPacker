@@ -41,6 +41,59 @@ const removeExcludedColumns = (data: any[]): any[] => {
   })
 }
 
+// Функция для удаления колонок ВП и Название задания из итогового отчета
+const removeFinalReportColumns = (data: any[]): any[] => {
+  if (data.length === 0) return data
+  
+  const columnsToRemove = ['ВП', 'vp', 'Название задания', 'Nazvanie_Zadaniya']
+  
+  return data.map(row => {
+    const filteredRow: any = {}
+    
+    for (const [key, value] of Object.entries(row)) {
+      // Пропускаем колонки ВП и Название задания
+      if (!columnsToRemove.includes(key)) {
+        filteredRow[key] = value
+      }
+    }
+    
+    return filteredRow
+  })
+}
+
+// Функция для применения маппинга номеров паллетов к полному отчету ВБ
+const applyPalletNumberMapping = (fullReportData: any[], palletSummary: any[]): any[] => {
+  if (!fullReportData || fullReportData.length === 0 || !palletSummary || palletSummary.length === 0) {
+    return fullReportData
+  }
+  
+  // Создаем маппинг оригинальный номер -> новый номер
+  const palletMapping: { [key: string]: number } = {}
+  
+  palletSummary.forEach(row => {
+    const originalPallet = row['Оригинальный номер паллета'] || row['original_pallet_number']
+    const newPallet = row['Новый номер паллета'] || row['renamed_number']
+    
+    if (originalPallet && newPallet) {
+      palletMapping[String(originalPallet)] = Number(newPallet)
+    }
+  })
+  
+  // Применяем маппинг к полному отчету
+  return fullReportData.map(row => {
+    const updatedRow = { ...row }
+    
+    // Обновляем номер паллета в полном отчете
+    const currentPallet = row['Pallet_No'] || row['Паллет №']
+    if (currentPallet && palletMapping[String(currentPallet)]) {
+      updatedRow['Pallet_No'] = palletMapping[String(currentPallet)]
+      updatedRow['Паллет №'] = palletMapping[String(currentPallet)]
+    }
+    
+    return updatedRow
+  })
+}
+
 interface TimeInfo {
   taskName: string
   startTime?: string
@@ -260,7 +313,7 @@ export const createExcelWithTimeInfo = (
         if (russianName === 'ШК' || russianName === 'ШК Сырья' || russianName === 'ШК WPS' || russianName === 'ВП') {
           renamedRow[russianName] = String(value || '')
         } 
-        // Обрабатываем операционные колонки - преобразуем в числа
+        // Обрабатываем операционные колонки - преобразуем в числа, но 0 заменяем на пустую строку
         else if (russianName.includes('Упаковка') || russianName.includes('Маркировка') || 
                  russianName.includes('Печать') || russianName.includes('Пересчет') ||
                  russianName.includes('Фасовка') || russianName.includes('Термо') ||
@@ -274,9 +327,13 @@ export const createExcelWithTimeInfo = (
                  russianName === 'Закрытая зона' || russianName === 'Крупногабаритный товар' ||
                  russianName === 'Ювелирные изделия' || russianName === 'Не сортируемый товар' ||
                  russianName === 'Сортируемый товар') {
-          // Преобразуем в число, если это возможно
+          // Преобразуем в число, если это возможно, но 0 заменяем на пустую строку
           const numValue = Number(value)
-          renamedRow[russianName] = !isNaN(numValue) && value !== null && value !== undefined ? numValue : (value || null)
+          if (!isNaN(numValue) && value !== null && value !== undefined) {
+            renamedRow[russianName] = numValue === 0 ? '' : numValue
+          } else {
+            renamedRow[russianName] = value || null
+          }
         }
         // Для остальных полей оставляем как есть
         else {
@@ -354,8 +411,9 @@ export const createExcelWithTimeInfo = (
     const wbReport = createWBReport(sourceData)
     if (wbReport.length > 0) {
       const reorderedWbReport = reorderColumns(wbReport) // Применяем переупорядочивание колонок
-      const wbWorksheet = XLSX.utils.json_to_sheet(reorderedWbReport)
-      autosizeColumns(wbWorksheet, reorderedWbReport, Object.keys(reorderedWbReport[0] || {}))
+      const cleanedWbReport = removeFinalReportColumns(reorderedWbReport) // Удаляем ВП и Название задания
+      const wbWorksheet = XLSX.utils.json_to_sheet(cleanedWbReport)
+      autosizeColumns(wbWorksheet, cleanedWbReport, Object.keys(cleanedWbReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, wbWorksheet, 'WB Отклонения')
     }
   }
@@ -364,8 +422,9 @@ export const createExcelWithTimeInfo = (
     const ozonReport = createOzonReport(sourceData)
     if (ozonReport.length > 0) {
       const reorderedOzonReport = reorderColumns(ozonReport) // Применяем переупорядочивание колонок
-      const ozonWorksheet = XLSX.utils.json_to_sheet(reorderedOzonReport)
-      autosizeColumns(ozonWorksheet, reorderedOzonReport, Object.keys(reorderedOzonReport[0] || {}))
+      const cleanedOzonReport = removeFinalReportColumns(reorderedOzonReport) // Удаляем ВП и Название задания
+      const ozonWorksheet = XLSX.utils.json_to_sheet(cleanedOzonReport)
+      autosizeColumns(ozonWorksheet, cleanedOzonReport, Object.keys(cleanedOzonReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, ozonWorksheet, 'Озон Отклонения')
     }
   }
@@ -375,8 +434,9 @@ export const createExcelWithTimeInfo = (
     const generalReport = createWBReport(sourceData) // Используем ту же логику
     if (generalReport.length > 0) {
       const reorderedGeneralReport = reorderColumns(generalReport) // Применяем переупорядочивание колонок
-      const generalWorksheet = XLSX.utils.json_to_sheet(reorderedGeneralReport)
-      autosizeColumns(generalWorksheet, reorderedGeneralReport, Object.keys(reorderedGeneralReport[0] || {}))
+      const cleanedGeneralReport = removeFinalReportColumns(reorderedGeneralReport) // Удаляем ВП и Название задания
+      const generalWorksheet = XLSX.utils.json_to_sheet(cleanedGeneralReport)
+      autosizeColumns(generalWorksheet, cleanedGeneralReport, Object.keys(cleanedGeneralReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, generalWorksheet, 'Отклонения количества')
     }
   }
@@ -385,30 +445,41 @@ export const createExcelWithTimeInfo = (
   if (sourceData.length > 0) {
     const palletSummary = createPalletSummary(sourceData, isWB)
     if (palletSummary.length > 0) {
-      const palletWorksheet = XLSX.utils.json_to_sheet(palletSummary)
-      autosizeColumns(palletWorksheet, palletSummary, Object.keys(palletSummary[0] || {}))
+      const cleanedPalletSummary = removeFinalReportColumns(palletSummary) // Удаляем ВП и Название задания
+      const palletWorksheet = XLSX.utils.json_to_sheet(cleanedPalletSummary)
+      autosizeColumns(palletWorksheet, cleanedPalletSummary, Object.keys(cleanedPalletSummary[0] || {}))
       XLSX.utils.book_append_sheet(workbook, palletWorksheet, 'Сводка по паллетам')
+      
+      // Для ВБ: применяем маппинг номеров паллетов к полному отчету
+      if (isWB && dataSet2.length > 0) {
+        dataSet2 = applyPalletNumberMapping(dataSet2, palletSummary)
+      }
     }
     
     // Создаем общую сводку по заданию
     const taskSummary = createTaskSummary(sourceData)
     if (taskSummary.length > 0) {
-      const taskSummaryWorksheet = XLSX.utils.json_to_sheet(taskSummary)
-      autosizeColumns(taskSummaryWorksheet, taskSummary, Object.keys(taskSummary[0] || {}))
+      const cleanedTaskSummary = removeFinalReportColumns(taskSummary) // Удаляем ВП и Название задания
+      const taskSummaryWorksheet = XLSX.utils.json_to_sheet(cleanedTaskSummary)
+      autosizeColumns(taskSummaryWorksheet, cleanedTaskSummary, Object.keys(cleanedTaskSummary[0] || {}))
       XLSX.utils.book_append_sheet(workbook, taskSummaryWorksheet, 'Общая сводка')
     }
   }
   
   // Добавляем листы с данными
   if (dataSet1.length > 0) {
-    const worksheet1 = XLSX.utils.json_to_sheet(dataSet1)
-    autosizeColumns(worksheet1, dataSet1, Object.keys(dataSet1[0] || {}))
+    // Удаляем колонки ВП и Название задания из краткого отчета
+    const cleanedDataSet1 = removeFinalReportColumns(dataSet1)
+    const worksheet1 = XLSX.utils.json_to_sheet(cleanedDataSet1)
+    autosizeColumns(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
     XLSX.utils.book_append_sheet(workbook, worksheet1, 'Краткий отчет')
   }
   
   if (dataSet2.length > 0) {
-    const worksheet2 = XLSX.utils.json_to_sheet(dataSet2)
-    autosizeColumns(worksheet2, dataSet2, Object.keys(dataSet2[0] || {}))
+    // Удаляем колонки ВП и Название задания из полного отчета
+    const cleanedDataSet2 = removeFinalReportColumns(dataSet2)
+    const worksheet2 = XLSX.utils.json_to_sheet(cleanedDataSet2)
+    autosizeColumns(worksheet2, cleanedDataSet2, Object.keys(cleanedDataSet2[0] || {}))
     XLSX.utils.book_append_sheet(workbook, worksheet2, 'Полный отчет')
   }
   
