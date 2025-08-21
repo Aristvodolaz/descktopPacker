@@ -11,16 +11,10 @@ const EXCLUDED_COLUMNS = [
   'Priemka_tovara_v_transportnykh_korobkakh',
   'Priemka_tovara_v_transportnykh_korobakh', // вариант без h в конце
   'Priemka_tovara_palletnaya',
-  'Razbrakovka_tovara',
-  'Sortiruemyi_Tovar',
-  // Дополнительные колонки для исключения
-  'Ne_Sortiruemyi_Tovar',
-  'Produkty',
-  'Opasnyi_Tovar',
-  'Zakrytaya_Zona',
-  'Krupnogabaritnyi_Tovar',
-  'Yuvelirnye_Izdelia',
-  'PriznakSortirovki'
+  'Razbrakovka_tovara'
+  // Убрали колонки для Озона из исключений:
+  // 'Sortiruemyi_Tovar', 'Ne_Sortiruemyi_Tovar', 'Produkty', 'Opasnyi_Tovar',
+  // 'Zakrytaya_Zona', 'Krupnogabaritnyi_Tovar', 'Yuvelirnye_Izdelia', 'PriznakSortirovki'
 ]
 
 // Функция для удаления исключенных колонок из данных
@@ -57,6 +51,77 @@ const removeFinalReportColumns = (data: any[]): any[] => {
       }
     }
     
+    return filteredRow
+  })
+}
+
+// Функция для удаления колонок Озона из ВБ отчетов
+const removeOzonColumnsForWB = (data: any[]): any[] => {
+  if (data.length === 0) return data
+  
+  const ozonColumns = [
+    'Сортируемый товар', 'Не сортируемый товар', 'Продукты', 
+    'Опасный товар', 'Закрытая зона', 'Крупногабаритный товар', 'Ювелирные изделия'
+  ]
+  
+  return data.map(row => {
+    const filteredRow: any = {}
+    
+    for (const [key, value] of Object.entries(row)) {
+      // Пропускаем колонки Озона для ВБ отчетов
+      if (!ozonColumns.includes(key)) {
+        filteredRow[key] = value
+      }
+    }
+    
+    return filteredRow
+  })
+}
+
+// Функция для обработки краткого отчета ВБ: проставление срока годности и удаление записей без ШК_WPS
+const processWBShortReport = (data: any[]): any[] => {
+  if (data.length === 0) return data
+  
+  // Группируем по артикулам для проставления срока годности
+  const artikulGroups: { [key: string]: any[] } = {}
+  
+  data.forEach(row => {
+    const artikul = row['Артикул'] || row['Artikul']
+    if (artikul) {
+      if (!artikulGroups[artikul]) {
+        artikulGroups[artikul] = []
+      }
+      artikulGroups[artikul].push(row)
+    }
+  })
+  
+  // Проставляем срок годности для одинаковых артикулов
+  Object.values(artikulGroups).forEach(group => {
+    // Находим срок годности в группе (где он есть)
+    const expiryDate = group.find(row => 
+      row['Срок Годности'] || row['Srok_Godnosti']
+    )?.['Срок Годности'] || group.find(row => 
+      row['Срок Годности'] || row['Srok_Godnosti']
+    )?.['Srok_Godnosti']
+    
+    // Проставляем найденный срок годности всем записям в группе
+    if (expiryDate) {
+      group.forEach(row => {
+        row['Срок Годности'] = expiryDate
+        row['Srok_Godnosti'] = expiryDate
+      })
+    }
+  })
+  
+  // Удаляем записи без ШК_WPS
+  const filteredData = data.filter(row => {
+    const shkWps = row['ШК WPS'] || row['SHK_WPS']
+    return shkWps && String(shkWps).trim() !== ''
+  })
+  
+  // Удаляем поле Srok_Godnosti из краткого отчета
+  return filteredData.map(row => {
+    const { Srok_Godnosti, ...filteredRow } = row
     return filteredRow
   })
 }
@@ -256,23 +321,103 @@ const reorderColumns = (data: any[]): any[] => {
   })
 }
 
-// Функция для автоподбора ширины колонок по максимальной длине текста
-function autosizeColumns(worksheet: XLSX.WorkSheet, data: any[], header: string[]) {
-  const MAX_WIDTH = 40 // Максимальная ширина колонки в символах
-  const colWidths = header.map((col, _) => {
-    // Максимальная длина: заголовок или значение в строке
-    let maxLen = (col ? String(col).length : 10)
-    for (const row of data) {
-      const val = row[col]
-      if (val !== undefined && val !== null) {
-        const len = String(val).length
-        if (len > maxLen) maxLen = len
-      }
+// Функция для установки фиксированной ширины колонок
+function autosizeColumns(worksheet: XLSX.WorkSheet, _data: any[], header: string[]) {
+  // Устанавливаем фиксированную ширину для всех колонок
+  const FIXED_WIDTH = 12 // Фиксированная ширина колонки в символах
+  const colWidths = header.map((col, _index) => {
+    // Определяем ширину в зависимости от типа колонки
+    let width = FIXED_WIDTH
+    
+    // Для некоторых колонок устанавливаем специальную ширину
+    if (col === 'ВП' || col === 'Артикул' || col === 'Артикул Сырья' || col === 'ШК' || col === 'ШК Сырья') {
+      width = 15 // Шире для кодов и артикулов
+    } else if (col === 'Номенклатура' || col === 'Название товара') {
+      width = 20 // Шире для названий
+    } else if (col === 'Название задания') {
+      width = 25 // Самая широкая для названия задания
+    } else if (col.includes('Упаковка') || col.includes('Маркировка') || col.includes('Пересчет') || 
+               col.includes('Фасовка') || col.includes('Термо') || col.includes('Разбор') || 
+               col.includes('Подготовка') || col.includes('Раскомплект') || col.includes('Удаление') ||
+               col.includes('Проверка') || col.includes('Спецификация') || col.includes('Вложить') ||
+               col.includes('Измерение') || col.includes('Индекс') || col.includes('Прочие') ||
+               col.includes('Сборка') || col.includes('Хранение') || col === 'Тип операции' ||
+               col === 'Сортируемый товар' || col === 'Не сортируемый товар' || col === 'Продукты' ||
+               col === 'Опасный товар' || col === 'Закрытая зона' || col === 'Крупногабаритный товар' ||
+               col === 'Ювелирные изделия') {
+      width = 10 // Уже для операционных колонок
     }
-    // Немного увеличим ширину для красоты, но не больше MAX_WIDTH
-    return { wch: Math.min(maxLen + 2, MAX_WIDTH) }
+    
+    return { 
+      wch: width,
+      wrapText: true // Включаем перенос текста
+    }
   })
   worksheet['!cols'] = colWidths
+}
+
+// Функция для установки форматирования ячеек с переносом текста
+function setCellFormatting(worksheet: XLSX.WorkSheet, _data: any[], _header: string[]) {
+  // Устанавливаем форматирование для всех ячеек
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+  
+  for (let row = range.s.r; row <= range.e.r; row++) {
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+      
+      if (!worksheet[cellAddress]) {
+        worksheet[cellAddress] = { v: '', t: 's' }
+      }
+      
+      // Устанавливаем форматирование с переносом текста
+      if (!worksheet[cellAddress].s) {
+        worksheet[cellAddress].s = {}
+      }
+      
+      // Специальное форматирование для заголовков (первая строка)
+      if (row === 0) {
+        worksheet[cellAddress].s = {
+          ...worksheet[cellAddress].s,
+          alignment: {
+            vertical: 'center',
+            horizontal: 'center',
+            wrapText: true
+          },
+          font: {
+            name: 'Calibri',
+            sz: 9,
+            bold: true
+          },
+          border: {
+            top: { style: 'thin', color: { rgb: '000000' } },
+            bottom: { style: 'thin', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: '000000' } },
+            right: { style: 'thin', color: { rgb: '000000' } }
+          }
+        }
+      } else {
+        // Форматирование для данных (остальные строки)
+        worksheet[cellAddress].s = {
+          ...worksheet[cellAddress].s,
+          alignment: {
+            vertical: 'top',
+            horizontal: 'left',
+            wrapText: true
+          },
+          font: {
+            name: 'Calibri',
+            sz: 10
+          },
+          border: {
+            top: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            bottom: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            left: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            right: { style: 'thin', color: { rgb: 'D0D0D0' } }
+          }
+        }
+      }
+    }
+  }
 }
 
 // Основная функция для создания Excel файла с данными о времени
@@ -323,7 +468,7 @@ export const createExcelWithTimeInfo = (
                  russianName.includes('Вложить') || russianName.includes('Измерение') ||
                  russianName.includes('Индекс') || russianName.includes('Прочие') ||
                  russianName.includes('Сборка') || russianName.includes('Хранение') ||
-                 russianName === 'Продукты' || russianName === 'Опасный товар' ||
+                 russianName === 'Тип операции' || russianName === 'Продукты' || russianName === 'Опасный товар' ||
                  russianName === 'Закрытая зона' || russianName === 'Крупногабаритный товар' ||
                  russianName === 'Ювелирные изделия' || russianName === 'Не сортируемый товар' ||
                  russianName === 'Сортируемый товар') {
@@ -351,6 +496,13 @@ export const createExcelWithTimeInfo = (
   if (dataSet1.length > 0) {
     dataSet1 = removeExcludedColumns(dataSet1) // Удаляем исключенные колонки
     dataSet1 = renameColumns(dataSet1)
+    
+    // Специальная обработка для ВБ краткого отчета
+    if (isWB) {
+      dataSet1 = processWBShortReport(dataSet1) // Проставляем срок годности и удаляем записи без ШК_WPS
+      dataSet1 = removeOzonColumnsForWB(dataSet1) // Удаляем колонки Озона для ВБ
+    }
+    
     dataSet1 = reorderColumns(dataSet1) // Переупорядочиваем колонки
   }
   
@@ -363,6 +515,7 @@ export const createExcelWithTimeInfo = (
     dataSet2 = removeExcludedColumns(dataSet2)
     dataSet2 = renameColumns(dataSet2)
     dataSet2 = filterData(dataSet2)
+    dataSet2 = removeOzonColumnsForWB(dataSet2) // Удаляем колонки Озона для ВБ
     dataSet2 = reorderColumns(dataSet2)
   } else if (isWB && dataSet1.length > 0) {
     // Если нет полного отчета, используем старую логику агрегации
@@ -372,6 +525,7 @@ export const createExcelWithTimeInfo = (
       let processedAggregatedData = removeExcludedColumns(aggregatedData)
       processedAggregatedData = renameColumns(processedAggregatedData)
       processedAggregatedData = filterData(processedAggregatedData)
+      processedAggregatedData = removeOzonColumnsForWB(processedAggregatedData) // Удаляем колонки Озона для ВБ
       processedAggregatedData = reorderColumns(processedAggregatedData)
       
       // Добавляем агрегированные данные к полному отчету
@@ -399,6 +553,70 @@ export const createExcelWithTimeInfo = (
   ]
   
   const timeWorksheet = XLSX.utils.aoa_to_sheet(timeData)
+  
+  // Устанавливаем ширину колонок для листа времени
+  timeWorksheet['!cols'] = [
+    { wch: 25 }, // Первая колонка - названия полей
+    { wch: 40 }  // Вторая колонка - значения
+  ]
+  
+  // Применяем форматирование к листу времени
+  const timeRange = XLSX.utils.decode_range(timeWorksheet['!ref'] || 'A1')
+  for (let row = timeRange.s.r; row <= timeRange.e.r; row++) {
+    for (let col = timeRange.s.c; col <= timeRange.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+      
+      if (!timeWorksheet[cellAddress]) {
+        timeWorksheet[cellAddress] = { v: '', t: 's' }
+      }
+      
+      if (!timeWorksheet[cellAddress].s) {
+        timeWorksheet[cellAddress].s = {}
+      }
+      
+      // Форматирование для заголовка (первая строка)
+      if (row === 0) {
+        timeWorksheet[cellAddress].s = {
+          alignment: {
+            vertical: 'center',
+            horizontal: 'center',
+            wrapText: true
+          },
+          font: {
+            name: 'Calibri',
+            sz: 12,
+            bold: true
+          },
+          border: {
+            top: { style: 'thin', color: { rgb: '000000' } },
+            bottom: { style: 'thin', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: '000000' } },
+            right: { style: 'thin', color: { rgb: '000000' } }
+          }
+        }
+      } else {
+        // Форматирование для данных
+        timeWorksheet[cellAddress].s = {
+          alignment: {
+            vertical: 'center',
+            horizontal: 'left',
+            wrapText: true
+          },
+          font: {
+            name: 'Calibri',
+            sz: 10
+          },
+          border: {
+            top: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            bottom: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            left: { style: 'thin', color: { rgb: 'D0D0D0' } },
+            right: { style: 'thin', color: { rgb: 'D0D0D0' } }
+          }
+        }
+      }
+    }
+  }
+  
   XLSX.utils.book_append_sheet(workbook, timeWorksheet, 'Время работы')
 
      // Создаем отчеты с отклонениями для WB и Озон
@@ -412,8 +630,10 @@ export const createExcelWithTimeInfo = (
     if (wbReport.length > 0) {
       const reorderedWbReport = reorderColumns(wbReport) // Применяем переупорядочивание колонок
       const cleanedWbReport = removeFinalReportColumns(reorderedWbReport) // Удаляем ВП и Название задания
-      const wbWorksheet = XLSX.utils.json_to_sheet(cleanedWbReport)
-      autosizeColumns(wbWorksheet, cleanedWbReport, Object.keys(cleanedWbReport[0] || {}))
+      const finalWbReport = removeOzonColumnsForWB(cleanedWbReport) // Удаляем колонки Озона для ВБ
+      const wbWorksheet = XLSX.utils.json_to_sheet(finalWbReport)
+      autosizeColumns(wbWorksheet, finalWbReport, Object.keys(finalWbReport[0] || {}))
+      setCellFormatting(wbWorksheet, finalWbReport, Object.keys(finalWbReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, wbWorksheet, 'WB Отклонения')
     }
   }
@@ -425,6 +645,7 @@ export const createExcelWithTimeInfo = (
       const cleanedOzonReport = removeFinalReportColumns(reorderedOzonReport) // Удаляем ВП и Название задания
       const ozonWorksheet = XLSX.utils.json_to_sheet(cleanedOzonReport)
       autosizeColumns(ozonWorksheet, cleanedOzonReport, Object.keys(cleanedOzonReport[0] || {}))
+      setCellFormatting(ozonWorksheet, cleanedOzonReport, Object.keys(cleanedOzonReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, ozonWorksheet, 'Озон Отклонения')
     }
   }
@@ -437,6 +658,7 @@ export const createExcelWithTimeInfo = (
       const cleanedGeneralReport = removeFinalReportColumns(reorderedGeneralReport) // Удаляем ВП и Название задания
       const generalWorksheet = XLSX.utils.json_to_sheet(cleanedGeneralReport)
       autosizeColumns(generalWorksheet, cleanedGeneralReport, Object.keys(cleanedGeneralReport[0] || {}))
+      setCellFormatting(generalWorksheet, cleanedGeneralReport, Object.keys(cleanedGeneralReport[0] || {}))
       XLSX.utils.book_append_sheet(workbook, generalWorksheet, 'Отклонения количества')
     }
   }
@@ -445,9 +667,16 @@ export const createExcelWithTimeInfo = (
   if (sourceData.length > 0) {
     const palletSummary = createPalletSummary(sourceData, isWB)
     if (palletSummary.length > 0) {
-      const cleanedPalletSummary = removeFinalReportColumns(palletSummary) // Удаляем ВП и Название задания
+      let cleanedPalletSummary = removeFinalReportColumns(palletSummary) // Удаляем ВП и Название задания
+      
+      // Для ВБ удаляем колонки Озона
+      if (isWB) {
+        cleanedPalletSummary = removeOzonColumnsForWB(cleanedPalletSummary)
+      }
+      
       const palletWorksheet = XLSX.utils.json_to_sheet(cleanedPalletSummary)
       autosizeColumns(palletWorksheet, cleanedPalletSummary, Object.keys(cleanedPalletSummary[0] || {}))
+      setCellFormatting(palletWorksheet, cleanedPalletSummary, Object.keys(cleanedPalletSummary[0] || {}))
       XLSX.utils.book_append_sheet(workbook, palletWorksheet, 'Сводка по паллетам')
       
       // Для ВБ: применяем маппинг номеров паллетов к полному отчету
@@ -459,9 +688,16 @@ export const createExcelWithTimeInfo = (
     // Создаем общую сводку по заданию
     const taskSummary = createTaskSummary(sourceData)
     if (taskSummary.length > 0) {
-      const cleanedTaskSummary = removeFinalReportColumns(taskSummary) // Удаляем ВП и Название задания
+      let cleanedTaskSummary = removeFinalReportColumns(taskSummary) // Удаляем ВП и Название задания
+      
+      // Для ВБ удаляем колонки Озона
+      if (isWB) {
+        cleanedTaskSummary = removeOzonColumnsForWB(cleanedTaskSummary)
+      }
+      
       const taskSummaryWorksheet = XLSX.utils.json_to_sheet(cleanedTaskSummary)
       autosizeColumns(taskSummaryWorksheet, cleanedTaskSummary, Object.keys(cleanedTaskSummary[0] || {}))
+      setCellFormatting(taskSummaryWorksheet, cleanedTaskSummary, Object.keys(cleanedTaskSummary[0] || {}))
       XLSX.utils.book_append_sheet(workbook, taskSummaryWorksheet, 'Общая сводка')
     }
   }
@@ -472,6 +708,7 @@ export const createExcelWithTimeInfo = (
     const cleanedDataSet1 = removeFinalReportColumns(dataSet1)
     const worksheet1 = XLSX.utils.json_to_sheet(cleanedDataSet1)
     autosizeColumns(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
+    setCellFormatting(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
     XLSX.utils.book_append_sheet(workbook, worksheet1, 'Краткий отчет')
   }
   
@@ -480,6 +717,7 @@ export const createExcelWithTimeInfo = (
     const cleanedDataSet2 = removeFinalReportColumns(dataSet2)
     const worksheet2 = XLSX.utils.json_to_sheet(cleanedDataSet2)
     autosizeColumns(worksheet2, cleanedDataSet2, Object.keys(cleanedDataSet2[0] || {}))
+    setCellFormatting(worksheet2, cleanedDataSet2, Object.keys(cleanedDataSet2[0] || {}))
     XLSX.utils.book_append_sheet(workbook, worksheet2, 'Полный отчет')
   }
   
