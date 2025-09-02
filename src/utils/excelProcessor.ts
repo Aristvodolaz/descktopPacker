@@ -449,6 +449,21 @@ export const createExcelWithTimeInfo = (
   
   // Переименовываем колонки и обрабатываем данные
   const renameColumns = (dataset: any[]) => {
+    // Отладочная информация: выводим все колонки из первой строки
+    if (dataset.length > 0) {
+      console.log('=== DEBUG: Доступные колонки в данных ===')
+      console.log('Английские названия:', Object.keys(dataset[0]))
+      
+      // Проверяем, есть ли колонки, связанные с хранением
+      const storageRelatedKeys = Object.keys(dataset[0]).filter(key => 
+        key.toLowerCase().includes('storage') || 
+        key.toLowerCase().includes('khranenie') || 
+        key.toLowerCase().includes('hranenie') ||
+        key.toLowerCase().includes('store')
+      )
+      console.log('Колонки, связанные с хранением:', storageRelatedKeys)
+    }
+    
     return dataset.map(row => {
       const renamedRow: any = {}
       for (const [key, value] of Object.entries(row)) {

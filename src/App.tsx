@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Tasks from './pages/Tasks'
+import Reports from './pages/Reports'
 
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/reports" element={<Reports />} />
         </Routes>
       </Layout>
     </motion.div>

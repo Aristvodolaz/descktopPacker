@@ -127,4 +127,67 @@ export interface TimeInfo {
   endTime?: string
   duration?: string
   taskName: string
+}
+
+// Report Builder Types
+export interface ReportField {
+  id: string
+  name: string
+  type: 'string' | 'number' | 'date' | 'boolean'
+  category: string
+}
+
+export interface ReportFilter {
+  field: string
+  operator: 'equals' | 'contains' | 'greater' | 'less' | 'between' | 'in'
+  value: any
+}
+
+export interface ReportSort {
+  field: string
+  direction: 'asc' | 'desc'
+}
+
+export interface ReportConfig {
+  id?: string
+  name: string
+  platform: 'wildberries' | 'ozon'
+  fields: string[]
+  filters: ReportFilter[]
+  sorting: ReportSort[]
+  groupBy?: string[]
+  dateRange?: {
+    from: string
+    to: string
+  }
+}
+
+export interface SavedReport {
+  id: string
+  name: string
+  platform: 'wildberries' | 'ozon'
+  config: ReportConfig
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface ReportTemplate {
+  id: string
+  name: string
+  description?: string
+  platform: 'wildberries' | 'ozon'
+  reportType?: 'short' | 'full' // Для WB
+  config: {
+    fields: string[]
+    filters: ReportFilter[]
+    sorting: ReportSort[]
+    groupBy?: string[]
+    dateRange?: {
+      from: string
+      to: string
+    }
+  }
+  createdAt: string
+  updatedAt?: string
+  isDefault?: boolean
 } 

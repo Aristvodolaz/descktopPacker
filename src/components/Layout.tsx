@@ -4,7 +4,8 @@ import { motion } from 'framer-motion'
 import { 
   HomeIcon, 
   CloudArrowUpIcon, 
-  DocumentTextIcon, 
+  DocumentTextIcon,
+  ChartBarIcon,
   Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline'
@@ -17,6 +18,7 @@ const navigation = [
   { name: 'Главная', href: '/', icon: HomeIcon },
   { name: 'Загрузка', href: '/upload', icon: CloudArrowUpIcon },
   { name: 'Задания', href: '/tasks', icon: DocumentTextIcon },
+  { name: 'Отчеты', href: '/reports', icon: ChartBarIcon },
 ]
 
 export default function Layout({ children }: LayoutProps) {

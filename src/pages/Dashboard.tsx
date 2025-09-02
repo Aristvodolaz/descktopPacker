@@ -6,7 +6,8 @@ import {
   DocumentTextIcon, 
   ClockIcon, 
   CheckCircleIcon,
-  CloudArrowUpIcon 
+  CloudArrowUpIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline'
 import { getTasksInProgress, getCompletedTasks, getUploadedTasks } from '../utils/api'
 
@@ -222,7 +223,7 @@ export default function Dashboard() {
           <p className="text-primary-100 mb-8">
             Выберите действие для быстрого доступа к основным функциям
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.a
               href="/upload"
               whileHover={{ scale: 1.05 }}
@@ -240,6 +241,15 @@ export default function Dashboard() {
             >
               <DocumentTextIcon className="h-8 w-8 mx-auto mb-3" />
               <span className="font-medium">Просмотр заданий</span>
+            </motion.a>
+            <motion.a
+              href="/reports"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="bg-white/20 backdrop-blur-sm rounded-lg p-6 text-center hover:bg-white/30 transition-all duration-200"
+            >
+              <ChartBarIcon className="h-8 w-8 mx-auto mb-3" />
+              <span className="font-medium">Конструктор отчетов</span>
             </motion.a>
         
           </div>

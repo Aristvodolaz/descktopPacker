@@ -31,12 +31,7 @@ export const uploadColumnMappings: Record<string, string> = {
   'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов от 2 штук разных товаров',
   'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
   'Khranenie_tovara': 'Хранение товара',
-  'Hranenie_tovara': 'Хранение товара',
-  'Storage': 'Хранение товара',
-  'Khranenie': 'Хранение товара',
-  'Hranenie': 'Хранение товара',
-  'Storage_goods': 'Хранение товара',
-  
+
   // Основные поля
   'Artikul': 'Артикул',
   'Artikul_Syrya': 'Артикул Сырья',
@@ -93,11 +88,7 @@ export const downloadColumnMappings: Record<string, string> = {
   'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов (комплектов) от 2-х штук разных товаров',
   'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
   'Khranenie_tovara': 'Хранение товара',
-  'Hranenie_tovara': 'Хранение товара',
-  'Storage': 'Хранение товара',
-  'Khranenie': 'Хранение товара',
-  'Hranenie': 'Хранение товара',
-  'Storage_goods': 'Хранение товара',
+  
   
   // Основные поля
   'Artikul': 'Артикул',
