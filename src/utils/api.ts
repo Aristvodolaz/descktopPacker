@@ -204,4 +204,15 @@ export const getReportFields = async (platform: 'wildberries' | 'ozon'): Promise
   return response.data.fields || []
 }
 
+// Reception Report API methods
+export const getUniqueTaskNames = async (): Promise<{ Nazvanie_Zadaniya: string }[]> => {
+  const response = await api.get('/privyazka/uniqueTaskNames')
+  return response.data.value || []
+}
+
+export const getTaskRecords = async (taskName: string): Promise<any[]> => {
+  const response = await api.get(`/privyazka/taskRecords?name=${encodeURIComponent(taskName)}`)
+  return response.data.value || []
+}
+
 export default api 

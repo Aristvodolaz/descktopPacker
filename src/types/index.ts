@@ -190,4 +190,18 @@ export interface ReportTemplate {
   createdAt: string
   updatedAt?: string
   isDefault?: boolean
+}
+
+// Reception Report Types
+export interface TaskName {
+  Nazvanie_Zadaniya: string
+}
+
+export interface TaskRecord {
+  Nazvanie_Zadaniya: string
+  VP: string
+  Artikul: string
+  Plans: number
+  Fact: number
+  Razlichie: number
 } 

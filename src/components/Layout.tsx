@@ -6,6 +6,7 @@ import {
   CloudArrowUpIcon, 
   DocumentTextIcon,
   ChartBarIcon,
+  ClipboardDocumentListIcon,
   Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline'
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Загрузка', href: '/upload', icon: CloudArrowUpIcon },
   { name: 'Задания', href: '/tasks', icon: DocumentTextIcon },
   { name: 'Отчеты', href: '/reports', icon: ChartBarIcon },
+  { name: 'Отчет о приемке', href: '/reception-report', icon: ClipboardDocumentListIcon },
 ]
 
 export default function Layout({ children }: LayoutProps) {

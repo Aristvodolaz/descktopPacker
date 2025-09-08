@@ -8,6 +8,12 @@ echo "Starting Packer Desktop Web Application..."
 # Set the working directory
 cd /home/admin-lc/descktopPacker
 
+# Fix permissions
+echo "Fixing permissions..."
+chmod -R 755 .
+chmod -R 755 node_modules/.bin
+chmod +x node_modules/.bin/vite
+
 # Source nvm
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -42,9 +48,12 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Start the application
-echo "Starting the application..."
-npm run dev
+# Install global dependencies if needed
+echo "Checking global dependencies..."
+if ! command -v vite &> /dev/null; then
+    echo "Installing Vite globally..."
+    npm install -g vite
+fi
 
 # Создаем папку для логов
 mkdir -p logs
@@ -60,7 +69,7 @@ read -p "Введите номер (1-3): " choice
 case $choice in
     1)
         echo "🔧 Запуск в режиме разработки..."
-        npm run dev
+        npx vite
         ;;
     2)
         echo "🏗️ Сборка для продакшена..."
