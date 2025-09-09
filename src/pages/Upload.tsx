@@ -147,9 +147,13 @@ export default function Upload() {
           }
           
           // Обрабатываем числовые поля
-          if (['Artikul', 'Artikul_Syrya', 'SHK', 'SHK_Syrya', 'SHK_SPO', 'Kol_vo_Syrya', 'Itog_Zakaz', 'Vlozhennost', 'Plan_Otkaz'].includes(englishKey)) {
+          if (['Kol_vo_Syrya', 'Itog_Zakaz', 'Vlozhennost', 'Plan_Otkaz'].includes(englishKey)) {
             const numValue = Number(value)
             processedRow[englishKey] = !isNaN(numValue) ? numValue : null
+          }
+          // Обрабатываем поля, которые должны быть строками
+          else if (['Artikul', 'Artikul_Syrya', 'SHK', 'SHK_Syrya', 'SHK_SPO'].includes(englishKey)) {
+            processedRow[englishKey] = value ? String(value).trim() : null
           }
           // Обрабатываем значения операций
           else if (englishKey.startsWith('Op_') || 
