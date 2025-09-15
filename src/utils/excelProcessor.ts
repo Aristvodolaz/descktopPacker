@@ -12,7 +12,7 @@ const EXCLUDED_COLUMNS = [
   'Priemka_tovara_v_transportnykh_korobakh', // вариант без h в конце
   'Priemka_tovara_palletnaya',
   'Razbrakovka_tovara'
-  // Убрали колонки для Озона из исключений:
+  // Убрали колонки для Озона из исключений, чтобы они загружались корректно:
   // 'Sortiruemyi_Tovar', 'Ne_Sortiruemyi_Tovar', 'Produkty', 'Opasnyi_Tovar',
   // 'Zakrytaya_Zona', 'Krupnogabaritnyi_Tovar', 'Yuvelirnye_Izdelia', 'PriznakSortirovki'
 ]

@@ -72,6 +72,7 @@ export interface UploadData {
   Op_468_Proverka_SHK?: string
   Krupnogabaritnyi_Tovar?: string
   Yuvelirnye_Izdelia?: string
+  Zakrytaya_Zona?: string
   Pechat_Etiketki_s_SHK?: string
   Pechat_Etiketki_s_Opisaniem?: string
   PriznakSortirovki?: string

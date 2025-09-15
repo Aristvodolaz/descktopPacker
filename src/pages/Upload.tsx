@@ -47,16 +47,16 @@ export default function Upload() {
         'Priemka_tovara_v_transportnykh_korobkakh',
         'Priemka_tovara_v_transportnykh_korobakh', // вариант без h в конце
         'Priemka_tovara_palletnaya',
-        'Razbrakovka_tovara',
-        'Sortiruemyi_Tovar',
-        // Дополнительные колонки для исключения
-        'Ne_Sortiruemyi_Tovar',
-        'Produkty',
-        'Opasnyi_Tovar',
-        'Zakrytaya_Zona',
-        'Krupnogabaritnyi_Tovar',
-        'Yuvelirnye_Izdelia',
-        'PriznakSortirovki'
+        'Razbrakovka_tovara'
+        // Убрали следующие колонки из исключений, чтобы они загружались корректно:
+        // 'Sortiruemyi_Tovar',
+        // 'Ne_Sortiruemyi_Tovar',
+        // 'Produkty',
+        // 'Opasnyi_Tovar',
+        // 'Zakrytaya_Zona',
+        // 'Krupnogabaritnyi_Tovar',
+        // 'Yuvelirnye_Izdelia',
+        // 'PriznakSortirovki'
       ]
       
       // Преобразуем данные в нужный формат
@@ -110,6 +110,7 @@ export default function Upload() {
           Upakovka_v_PE_Paket: null,
           
           // Характеристики товара
+          Sortiruemyi_Tovar: null,
           Ne_Sortiruemyi_Tovar: null,
           Produkty: null,
           Opasnyi_Tovar: null,
@@ -155,11 +156,11 @@ export default function Upload() {
           else if (['Artikul', 'Artikul_Syrya', 'SHK', 'SHK_Syrya', 'SHK_SPO'].includes(englishKey)) {
             processedRow[englishKey] = value ? String(value).trim() : null
           }
-          // Обрабатываем значения операций
+          // Обрабатываем значения операций и сортировочные колонки
           else if (englishKey.startsWith('Op_') || 
               ['Ne_Sortiruemyi_Tovar', 'Opasnyi_Tovar', 
                'Krupnogabaritnyi_Tovar', 'Yuvelirnye_Izdelia', 'Produkty', 
-               'Zakrytaya_Zona', 'PriznakSortirovki'].includes(englishKey)) {
+               'Zakrytaya_Zona', 'PriznakSortirovki', 'Sortiruemyi_Tovar'].includes(englishKey)) {
             processedRow[englishKey] = processOpColumnValue(value)
           } 
           // Специальная обработка для поля Upakovka_v_Gofro - оставляем как строку
