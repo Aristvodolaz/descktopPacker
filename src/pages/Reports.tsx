@@ -6,8 +6,7 @@ import {
   CogIcon,
   PlayIcon
 } from '@heroicons/react/24/outline'
-import WildberriesReportBuilder from '../components/WildberriesReportBuilder'
-import OzonReportBuilder from '../components/OzonReportBuilder'
+import { EnhancedReportBuilder } from '../components/ReportBuilder'
 
 type Platform = 'wildberries' | 'ozon' | null
 
@@ -146,7 +145,7 @@ export default function Reports() {
             </button>
           </div>
         </div>
-        <WildberriesReportBuilder reportType={selectedWBReportType} />
+        <EnhancedReportBuilder platform="wildberries" reportType={selectedWBReportType} />
       </div>
     )
   }
@@ -166,7 +165,7 @@ export default function Reports() {
             ← Назад к выбору платформы
           </button>
         </div>
-        <OzonReportBuilder />
+        <EnhancedReportBuilder platform="ozon" />
       </div>
     )
   }
