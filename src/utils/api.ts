@@ -215,4 +215,13 @@ export const getTaskRecords = async (taskName: string): Promise<any[]> => {
   return response.data.value || []
 }
 
+// SHK Coroba binding
+export const updateShkCoroba = async (shkWps: string, shkCoroba: string): Promise<void> => {
+  // Используем существующий API инстанс (проксируется через /api -> http://10.171.12.36:3005)
+  await axios.post('/privyazka/updateShkCoroba', {
+    shk_wps: shkWps,
+    shk_coroba: shkCoroba
+  })
+}
+
 export default api 

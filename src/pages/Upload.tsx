@@ -9,12 +9,16 @@ import {
   XMarkIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline'
-import { getWarehouses, uploadRowData, checkTaskExists } from '../utils/api'
+import { getWarehouses, uploadRowData, checkTaskExists, updateShkCoroba } from '../utils/api'
 import { UploadData, UploadProgress } from '../types'
 import { processOpColumnValue, reverseUploadColumnMappings } from '../utils/columnMappings'
-import { processUploadedExcel } from '../utils/excelProcessor'
+import { processUploadedExcel, processShkCorobaExcel, ShkCorobaData } from '../utils/excelProcessor'
+
+// Тип для вкладок
+type TabType = 'tasks' | 'shkCoroba'
 
 export default function Upload() {
+  const [activeTab, setActiveTab] = useState<TabType>('tasks')
   const [selectedWarehouse, setSelectedWarehouse] = useState('')
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
     isUploading: false,
@@ -23,6 +27,15 @@ export default function Upload() {
     currentRow: 0
   })
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+
+  // Состояние для привязки ШК к коробам
+  const [shkCorobaFile, setShkCorobaFile] = useState<File | null>(null)
+  const [shkCorobaProgress, setShkCorobaProgress] = useState<UploadProgress>({
+    isUploading: false,
+    progress: 0,
+    total: 0,
+    currentRow: 0
+  })
 
   const { data: warehouses, isLoading: loadingWarehouses, error: errorWarehouses } = useQuery(
     'warehouses',
@@ -252,6 +265,81 @@ export default function Upload() {
     }
   }, [selectedWarehouse, processExcelData])
 
+  // Функция для загрузки данных привязки ШК к коробам
+  const uploadShkCorobaFile = useCallback(async (file: File) => {
+    try {
+      // Обрабатываем Excel файл
+      const data: ShkCorobaData[] = await processShkCorobaExcel(file)
+      
+      if (data.length === 0) {
+        toast.error('Файл не содержит данных для обработки')
+        return
+      }
+      
+      setShkCorobaProgress({
+        isUploading: true,
+        progress: 0,
+        total: data.length,
+        currentRow: 0
+      })
+
+      let successCount = 0
+      let errorCount = 0
+
+      for (let i = 0; i < data.length; i++) {
+        let success = false
+        let attempts = 0
+        const maxAttempts = 3
+
+        while (!success && attempts < maxAttempts) {
+          try {
+            await updateShkCoroba(data[i].shk_wps, data[i].shk_coroba)
+            success = true
+            successCount++
+            
+            setShkCorobaProgress(prev => ({
+              ...prev,
+              currentRow: i + 1,
+              progress: Math.round(((i + 1) / data.length) * 100)
+            }))
+          } catch (error: any) {
+            attempts++
+            console.error(`Ошибка при обработке строки ${i + 1} (попытка ${attempts}/${maxAttempts}):`, error)
+            
+            if (attempts >= maxAttempts) {
+              errorCount++
+              console.error(`Не удалось обработать строку ${i + 1} после ${maxAttempts} попыток`)
+              
+              // Продолжаем со следующей строкой
+              setShkCorobaProgress(prev => ({
+                ...prev,
+                currentRow: i + 1,
+                progress: Math.round(((i + 1) / data.length) * 100)
+              }))
+            } else {
+              // Пауза перед повторной попыткой
+              await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+          }
+        }
+      }
+
+      setShkCorobaProgress(prev => ({ ...prev, isUploading: false }))
+      
+      if (errorCount === 0) {
+        toast.success(`Все данные успешно загружены! Обработано строк: ${successCount}`)
+      } else {
+        toast.success(`Загрузка завершена! Успешно: ${successCount}, Ошибок: ${errorCount}`)
+      }
+      
+      setShkCorobaFile(null)
+    } catch (error: any) {
+      console.error('Upload error:', error)
+      toast.error(error.message || 'Ошибка при загрузке файла')
+      setShkCorobaProgress(prev => ({ ...prev, isUploading: false }))
+    }
+  }, [])
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (file) {
@@ -259,8 +347,27 @@ export default function Upload() {
     }
   }, [])
 
+  const onDropShkCoroba = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0]
+    if (file) {
+      setShkCorobaFile(file)
+    }
+  }, [])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+    },
+    multiple: false
+  })
+
+  const { 
+    getRootProps: getRootPropsShkCoroba, 
+    getInputProps: getInputPropsShkCoroba, 
+    isDragActive: isDragActiveShkCoroba 
+  } = useDropzone({
+    onDrop: onDropShkCoroba,
     accept: {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
     },
@@ -277,17 +384,57 @@ export default function Upload() {
       >
         <h1 className="text-3xl font-bold text-gray-900 mb-4">Загрузка файлов</h1>
         <p className="text-lg text-gray-600">
-          Выберите склад и загрузите Excel файл для обработки. Завершенные задания можно скачать в виде Excel файлов с данными о времени работы.
+          Выберите тип загрузки и загрузите Excel файл для обработки.
         </p>
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Важно:</strong> Повторная загрузка файлов с одинаковыми названиями запрещена. 
-            Каждое задание может быть загружено только один раз.
-          </p>
+      </motion.div>
+
+      {/* Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-white rounded-xl shadow-soft border border-gray-200 p-2"
+      >
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
+              activeTab === 'tasks'
+                ? 'bg-primary-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Загрузка заданий
+          </button>
+          <button
+            onClick={() => setActiveTab('shkCoroba')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
+              activeTab === 'shkCoroba'
+                ? 'bg-primary-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Привязка ШК к коробам
+          </button>
         </div>
       </motion.div>
 
-      {/* Warehouse Selection */}
+      {/* Content for "Загрузка заданий" tab */}
+      {activeTab === 'tasks' && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-blue-50 border border-blue-200 rounded-xl p-4"
+          >
+            <p className="text-sm text-blue-800">
+              <strong>Важно:</strong> Повторная загрузка файлов с одинаковыми названиями запрещена. 
+              Каждое задание может быть загружено только один раз.
+            </p>
+          </motion.div>
+
+          {/* Warehouse Selection */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -463,27 +610,200 @@ export default function Upload() {
         )}
       </AnimatePresence>
 
-      {/* Info Notice */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="bg-blue-50 border border-blue-200 rounded-xl p-6"
-      >
-        <div className="flex items-start space-x-3">
-          <DocumentIcon className="h-6 w-6 text-blue-600 mt-1" />
-          <div>
-            <h3 className="font-semibold text-blue-900 mb-2">Информация о загрузке</h3>
-            <div className="space-y-1 text-sm text-blue-800">
-              <p>• Поддерживаются только Excel файлы (.xlsx)</p>
-              <p>• Поле "Тип операции" принимает строковые значения (например: "Товар 18+", "Двойная упаковка")</p>
-              <p>• Обязательно выберите склад перед загрузкой</p>
-              <p>• Загрузка происходит построчно с автоматическими повторами при ошибках</p>
-              <p>• Завершенные задания можно скачать в формате Excel (.xlsx)</p>
+          {/* Info Notice */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-blue-50 border border-blue-200 rounded-xl p-6"
+          >
+            <div className="flex items-start space-x-3">
+              <DocumentIcon className="h-6 w-6 text-blue-600 mt-1" />
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-2">Информация о загрузке</h3>
+                <div className="space-y-1 text-sm text-blue-800">
+                  <p>• Поддерживаются только Excel файлы (.xlsx)</p>
+                  <p>• Поле "Тип операции" принимает строковые значения (например: "Товар 18+", "Двойная упаковка")</p>
+                  <p>• Обязательно выберите склад перед загрузкой</p>
+                  <p>• Загрузка происходит построчно с автоматическими повторами при ошибках</p>
+                  <p>• Завершенные задания можно скачать в формате Excel (.xlsx)</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </motion.div>
+          </motion.div>
+        </>
+      )}
+
+      {/* Content for "Привязка ШК к коробам" tab */}
+      {activeTab === 'shkCoroba' && (
+        <>
+          {/* Info Notice */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-blue-50 border border-blue-200 rounded-xl p-4"
+          >
+            <p className="text-sm text-blue-800">
+              <strong>Информация:</strong> Загрузите Excel файл с колонками "ШК WPS" и "SHK_Coroba" для привязки штрих-кодов к коробам.
+            </p>
+          </motion.div>
+
+          {/* File Upload */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl shadow-soft border border-gray-200 p-6"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Загрузка файла</h3>
+            
+            <div
+              {...getRootPropsShkCoroba()}
+              className={`
+                border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
+                ${isDragActiveShkCoroba 
+                  ? 'border-primary-400 bg-primary-50' 
+                  : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+                }
+              `}
+            >
+              <input {...getInputPropsShkCoroba()} />
+              <CloudArrowUpIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-lg font-medium text-gray-900 mb-2">
+                {isDragActiveShkCoroba ? 'Отпустите файл здесь' : 'Перетащите файл сюда'}
+              </p>
+              <p className="text-sm text-gray-600">
+                или нажмите для выбора файла (только .xlsx)
+              </p>
+            </div>
+
+            {/* Selected File */}
+            <AnimatePresence>
+              {shkCorobaFile && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-4"
+                >
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <DocumentIcon className="h-8 w-8 text-primary-600 mr-3" />
+                      <div>
+                        <p className="font-medium text-gray-900">{shkCorobaFile.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {(shkCorobaFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShkCorobaFile(null)}
+                      className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Upload Button */}
+            {shkCorobaFile && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6"
+              >
+                <button
+                  onClick={() => uploadShkCorobaFile(shkCorobaFile)}
+                  disabled={shkCorobaProgress.isUploading}
+                  className="btn-primary w-full py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {shkCorobaProgress.isUploading ? 'Загрузка...' : 'Загрузить файл'}
+                </button>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Upload Progress */}
+          <AnimatePresence>
+            {shkCorobaProgress.isUploading && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white rounded-xl shadow-soft border border-gray-200 p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Прогресс загрузки</h3>
+                  <span className="text-sm text-gray-600">
+                    {shkCorobaProgress.currentRow} / {shkCorobaProgress.total}
+                  </span>
+                </div>
+                
+                <div className="bg-gray-200 rounded-full h-3 mb-4">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${shkCorobaProgress.progress}%` }}
+                    className="bg-primary-600 h-3 rounded-full"
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Обработано строк: {shkCorobaProgress.currentRow}</span>
+                  <span>{shkCorobaProgress.progress}%</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Success Message */}
+          <AnimatePresence>
+            {!shkCorobaProgress.isUploading && shkCorobaProgress.progress === 100 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-success-50 border border-success-200 rounded-xl p-6"
+              >
+                <div className="flex items-center">
+                  <CheckCircleIcon className="h-8 w-8 text-success-600 mr-3" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-success-900">Загрузка завершена!</h3>
+                    <p className="text-success-700">
+                      Все данные успешно обработаны и отправлены на сервер
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Info Block */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-blue-50 border border-blue-200 rounded-xl p-6"
+          >
+            <div className="flex items-start space-x-3">
+              <DocumentIcon className="h-6 w-6 text-blue-600 mt-1" />
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-2">Формат Excel файла</h3>
+                <div className="space-y-1 text-sm text-blue-800">
+                  <p>• Файл должен содержать колонку "ШК WPS" (варианты: SHK_WPS, SHK WPS, ШК_WPS)</p>
+                  <p>• Файл должен содержать колонку "SHK_Coroba" (варианты: SHK Coroba, ШК Короба)</p>
+                  <p>• Поиск колонок происходит без учета регистра, пробелов и подчеркиваний</p>
+                  <p>• Поддерживаются только Excel файлы формата .xlsx</p>
+                  <p>• Каждая строка обрабатывается отдельно с автоматическими повторами при ошибках</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   )
 } 

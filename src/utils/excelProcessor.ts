@@ -1282,4 +1282,119 @@ export const processUploadedExcel = async (file: File): Promise<any[]> => {
     reader.onerror = () => reject(new Error('Ошибка чтения файла'))
     reader.readAsArrayBuffer(file)
   })
+}
+
+// Интерфейс для данных привязки ШК к коробам
+export interface ShkCorobaData {
+  shk_wps: string
+  shk_coroba: string
+}
+
+// Функция для нормализации названия колонки (удаляет пробелы, подчеркивания, приводит к нижнему регистру)
+const normalizeColumnName = (name: string): string => {
+  return name.toLowerCase().replace(/[\s_]/g, '')
+}
+
+// Функция для поиска колонки по различным вариантам названия
+const findColumnByVariants = (columns: string[], variants: string[]): string | null => {
+  const normalizedVariants = variants.map(normalizeColumnName)
+  
+  for (const column of columns) {
+    const normalizedColumn = normalizeColumnName(column)
+    if (normalizedVariants.includes(normalizedColumn)) {
+      return column
+    }
+  }
+  
+  return null
+}
+
+// Функция для обработки Excel файла с данными о привязке ШК к коробам
+export const processShkCorobaExcel = async (file: File): Promise<ShkCorobaData[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        
+        // Берем первый лист
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        
+        // Конвертируем в JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        
+        if (jsonData.length === 0) {
+          reject(new Error('Excel файл пустой'))
+          return
+        }
+        
+        // Получаем список колонок из первой строки
+        const columns = Object.keys(jsonData[0])
+        
+        // Варианты названий для колонки "ШК WPS"
+        const shkWpsVariants = [
+          'ШК WPS',
+          'SHK_WPS',
+          'SHK WPS',
+          'ШК_WPS',
+          'SHKWPS',
+          'ШКWPS'
+        ]
+        
+        // Варианты названий для колонки "SHK_Coroba"
+        const shkCorobaVariants = [
+          'SHK_Coroba',
+          'SHK Coroba',
+          'ШК Короба',
+          'ШК_Короба',
+          'SHKCoroba',
+          'ШККороба'
+        ]
+        
+        // Ищем колонки
+        const shkWpsColumn = findColumnByVariants(columns, shkWpsVariants)
+        const shkCorobaColumn = findColumnByVariants(columns, shkCorobaVariants)
+        
+        if (!shkWpsColumn) {
+          reject(new Error('Не найдена колонка "ШК WPS" (проверьте варианты: SHK_WPS, SHK WPS, ШК_WPS)'))
+          return
+        }
+        
+        if (!shkCorobaColumn) {
+          reject(new Error('Не найдена колонка "SHK_Coroba" (проверьте варианты: SHK Coroba, ШК Короба)'))
+          return
+        }
+        
+        // Извлекаем данные
+        const result: ShkCorobaData[] = []
+        
+        jsonData.forEach((row: any, index: number) => {
+          const shkWps = row[shkWpsColumn]
+          const shkCoroba = row[shkCorobaColumn]
+          
+          // Преобразуем значения в строки (если они есть)
+          if (shkWps !== null && shkWps !== undefined && shkWps !== '') {
+            result.push({
+              shk_wps: String(shkWps).trim(),
+              shk_coroba: shkCoroba !== null && shkCoroba !== undefined && shkCoroba !== '' 
+                ? String(shkCoroba).trim() 
+                : ''
+            })
+          } else {
+            console.warn(`Строка ${index + 2}: пропущена (пустое значение ШК WPS)`)
+          }
+        })
+        
+        resolve(result)
+      } catch (error) {
+        reject(error)
+      }
+    }
+    
+    reader.onerror = () => reject(new Error('Ошибка чтения файла'))
+    reader.readAsArrayBuffer(file)
+  })
 } 
