@@ -828,23 +828,30 @@ export const createExcelWithTimeInfo = (
   
   // Добавляем листы с данными
   if (dataSet1.length > 0) {
-    // Логируем данные перед агрегацией
-    console.log('=== ПЕРЕД АГРЕГАЦИЕЙ: dataSet1 ===')
-    console.log('Количество строк в dataSet1:', dataSet1.length)
-    console.log('Первые 5 строк dataSet1:')
-    dataSet1.slice(0, 5).forEach((row, index) => {
-      const artikul = row['Артикул'] || row['Artikul']
-      const shkWps = row['ШК WPS'] || row['SHK_WPS']
-      const palletNo = row['Паллет №'] || row['Pallet_No']
-      const vlozhennost = row['Вложенность'] || row['Vlozhennost']
-      console.log(`  ${index}: Артикул="${artikul}", ШК WPS="${shkWps}", Паллет="${palletNo}", Вложенность="${vlozhennost}"`)
-    })
+    // Агрегируем данные краткого отчета по Артикул + ШК WPS + Паллет № ТОЛЬКО для WB
+    let processedDataSet1 = dataSet1
     
-    // Агрегируем данные краткого отчета по Артикул + ШК WPS + Паллет №
-    const aggregatedDataSet1 = aggregateShortReport(dataSet1)
+    if (isWB) {
+      // Логируем данные перед агрегацией для WB
+      console.log('=== ПЕРЕД АГРЕГАЦИЕЙ WB: dataSet1 ===')
+      console.log('Количество строк в dataSet1:', dataSet1.length)
+      console.log('Первые 5 строк dataSet1:')
+      dataSet1.slice(0, 5).forEach((row, index) => {
+        const artikul = row['Артикул'] || row['Artikul']
+        const shkWps = row['ШК WPS'] || row['SHK_WPS']
+        const palletNo = row['Паллет №'] || row['Pallet_No']
+        const vlozhennost = row['Вложенность'] || row['Vlozhennost']
+        console.log(`  ${index}: Артикул="${artikul}", ШК WPS="${shkWps}", Паллет="${palletNo}", Вложенность="${vlozhennost}"`)
+      })
+      
+      // Агрегируем данные краткого отчета по Артикул + ШК WPS + Паллет №
+      processedDataSet1 = aggregateShortReport(dataSet1)
+    } else {
+      console.log('=== Агрегация НЕ применяется (не WB отчет) ===')
+    }
     
     // Удаляем колонки ВП и Название задания из краткого отчета
-    const cleanedDataSet1 = removeFinalReportColumns(aggregatedDataSet1)
+    const cleanedDataSet1 = removeFinalReportColumns(processedDataSet1)
     const worksheet1 = XLSX.utils.json_to_sheet(cleanedDataSet1)
     autosizeColumns(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
     setCellFormatting(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
@@ -1000,6 +1007,10 @@ interface PalletSummary {
 // Функция для создания сводки по паллетам
 const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   if (!data || data.length === 0) return []
+  
+  console.log('=== createPalletSummary: Создание сводки по паллетам ===')
+  console.log('Тип отчета:', isWB ? 'WB' : 'Озон/Другой')
+  console.log('Количество строк данных:', data.length)
 
   const palletGroups: {
     [key: string]: {
@@ -1042,18 +1053,17 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
 
     const group = palletGroups[palletNo]
 
-    // если есть ШК WPS — считаем по нему
+    // если есть ШК WPS — добавляем в Set для подсчета уникальных
     if (shkWps && String(shkWps).trim() !== '') {
       group.shkWpsSet.add(String(shkWps).trim())
     }
 
-    // название артикула
+    // название артикула — добавляем в Set для подсчета уникальных
     if (artikul && String(artikul).trim() !== '') {
       group.articlesSet.add(String(artikul).trim())
     }
 
-    // fallback: суммируем Место,
-    // если нет ШК WPS в данных
+    // ВСЕГДА суммируем поле "Место" для подсчета общего количества мест
     if (!Number.isNaN(mesto) && mesto > 0) {
       group.placesByMesto += mesto
     }
@@ -1062,10 +1072,13 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   // Собираем итоговую сводку
   const palletSummaries: PalletSummary[] = Object.entries(palletGroups).map(
     ([palletNo, group]) => {
-      const placesCount =
-        group.shkWpsSet.size > 0
-          ? group.shkWpsSet.size                // есть ШК — считаем по ним
-          : group.placesByMesto                 // нет ШК — считаем по «Место»
+      // Для WB: считаем по уникальным ШК WPS (если есть)
+      // Для Озона: ВСЕГДА сумма поля "Место"
+      const placesCount = isWB 
+        ? (group.shkWpsSet.size > 0 ? group.shkWpsSet.size : group.placesByMesto)  // WB: уникальные ШК WPS
+        : group.placesByMesto                                                       // Озон: сумма мест
+      
+      console.log(`Паллет ${palletNo}: Мест=${placesCount}, Уникальных ШК WPS=${group.shkWpsSet.size}, Артикулов=${group.articlesSet.size}, Сумма "Место"=${group.placesByMesto}`)
 
       return {
         pallet_number: palletNo,
@@ -1074,6 +1087,10 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
       }
     }
   )
+  
+  console.log('Всего паллетов в сводке:', palletSummaries.length)
+  console.log('=== createPalletSummary: Завершено ===')
+  console.log('')
 
   // сортировка по номеру паллета
   palletSummaries.sort((a, b) => {
