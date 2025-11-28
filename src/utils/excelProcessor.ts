@@ -114,10 +114,24 @@ const processWBShortReport = (data: any[]): any[] => {
   })
   
   // Удаляем записи без ШК_WPS
-  const filteredData = data.filter(row => {
+  console.log('=== processWBShortReport: Фильтрация по ШК WPS ===')
+  console.log('Строк до фильтрации:', data.length)
+  
+  const filteredData = data.filter((row, index) => {
     const shkWps = row['ШК WPS'] || row['SHK_WPS']
-    return shkWps && String(shkWps).trim() !== ''
+    const hasShkWps = shkWps && String(shkWps).trim() !== ''
+    
+    if (!hasShkWps && index < 10) {
+      const artikul = row['Артикул'] || row['Artikul']
+      const vlozhennost = row['Вложенность'] || row['Vlozhennost']
+      console.log(`  Удаляется строка ${index}: Артикул="${artikul}", ШК WPS="${shkWps}", Вложенность="${vlozhennost}"`)
+    }
+    
+    return hasShkWps
   })
+  
+  console.log('Строк после фильтрации:', filteredData.length)
+  console.log('Удалено строк без ШК WPS:', data.length - filteredData.length)
   
   // Удаляем поле Srok_Godnosti из краткого отчета
   return filteredData.map(row => {
@@ -447,6 +461,9 @@ export const createExcelWithTimeInfo = (
   // Определяем основной набор данных для извлечения времени
   const mainDataSet = dataSet2.length > 0 ? dataSet2 : dataSet1
   
+  // Сохраняем копию исходных данных для извлечения ШК WPS (до переименования колонок)
+  const originalMainDataSet = JSON.parse(JSON.stringify(mainDataSet))
+  
   // Переименовываем колонки и обрабатываем данные
   const renameColumns = (dataset: any[]) => {
     // Отладочная информация: выводим все колонки из первой строки
@@ -634,7 +651,99 @@ export const createExcelWithTimeInfo = (
   
   XLSX.utils.book_append_sheet(workbook, timeWorksheet, 'Время работы')
 
-     // Создаем отчеты с отклонениями для WB и Озон
+  // Создаем лист с уникальными ШК WPS
+  // Пробуем извлечь из всех доступных источников данных
+  console.log('=== DEBUG: Начало создания листа ШК WPS ===')
+  console.log('originalMainDataSet.length:', originalMainDataSet.length)
+  console.log('dataSet1.length:', dataSet1.length)
+  console.log('dataSet2.length:', dataSet2.length)
+  
+  // Сначала пробуем из исходных данных
+  let uniqueShkWps = extractUniqueShkWps(originalMainDataSet)
+  
+  // Если не нашли, пробуем из обработанных данных
+  if (uniqueShkWps.length === 0 && dataSet1.length > 0) {
+    console.log('Пробуем извлечь из dataSet1')
+    uniqueShkWps = extractUniqueShkWps(dataSet1)
+  }
+  
+  if (uniqueShkWps.length === 0 && dataSet2.length > 0) {
+    console.log('Пробуем извлечь из dataSet2')
+    uniqueShkWps = extractUniqueShkWps(dataSet2)
+  }
+  
+  console.log('Итоговое количество уникальных ШК WPS:', uniqueShkWps.length)
+  console.log('Первые 10 ШК:', uniqueShkWps.slice(0, 10))
+  
+  if (uniqueShkWps.length > 0) {
+      // Формируем данные для листа: массив объектов с одной колонкой
+      const shkWpsData = uniqueShkWps.map(shk => ({ 'ШК WPS': shk }))
+      
+      // Создаем лист
+      const shkWpsWorksheet = XLSX.utils.json_to_sheet(shkWpsData)
+      
+      // Устанавливаем ширину колонки
+      shkWpsWorksheet['!cols'] = [{ wch: 20 }]
+      
+      // Применяем форматирование
+      const shkRange = XLSX.utils.decode_range(shkWpsWorksheet['!ref'] || 'A1')
+      for (let row = shkRange.s.r; row <= shkRange.e.r; row++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: 0 })
+        
+        if (!shkWpsWorksheet[cellAddress]) {
+          shkWpsWorksheet[cellAddress] = { v: '', t: 's' }
+        }
+        
+        if (!shkWpsWorksheet[cellAddress].s) {
+          shkWpsWorksheet[cellAddress].s = {}
+        }
+        
+        // Форматирование для заголовка
+        if (row === 0) {
+          shkWpsWorksheet[cellAddress].s = {
+            alignment: {
+              vertical: 'center',
+              horizontal: 'center',
+              wrapText: true
+            },
+            font: {
+              name: 'Calibri',
+              sz: 10,
+              bold: true
+            },
+            border: {
+              top: { style: 'thin', color: { rgb: '000000' } },
+              bottom: { style: 'thin', color: { rgb: '000000' } },
+              left: { style: 'thin', color: { rgb: '000000' } },
+              right: { style: 'thin', color: { rgb: '000000' } }
+            }
+          }
+        } else {
+          // Форматирование для данных
+          shkWpsWorksheet[cellAddress].s = {
+            alignment: {
+              vertical: 'center',
+              horizontal: 'left',
+              wrapText: false
+            },
+            font: {
+              name: 'Calibri',
+              sz: 10
+            },
+            border: {
+              top: { style: 'thin', color: { rgb: 'D0D0D0' } },
+              bottom: { style: 'thin', color: { rgb: 'D0D0D0' } },
+              left: { style: 'thin', color: { rgb: 'D0D0D0' } },
+              right: { style: 'thin', color: { rgb: 'D0D0D0' } }
+            }
+          }
+        }
+      }
+      
+      XLSX.utils.book_append_sheet(workbook, shkWpsWorksheet, 'Уникальные ШК WPS')
+  }
+
+  // Создаем отчеты с отклонениями для WB и Озон
     const sourceData = dataSet2.length > 0 ? dataSet2 : dataSet1
    
    // Определяем тип отчета Озон (isWB уже определен выше)
@@ -719,8 +828,23 @@ export const createExcelWithTimeInfo = (
   
   // Добавляем листы с данными
   if (dataSet1.length > 0) {
+    // Логируем данные перед агрегацией
+    console.log('=== ПЕРЕД АГРЕГАЦИЕЙ: dataSet1 ===')
+    console.log('Количество строк в dataSet1:', dataSet1.length)
+    console.log('Первые 5 строк dataSet1:')
+    dataSet1.slice(0, 5).forEach((row, index) => {
+      const artikul = row['Артикул'] || row['Artikul']
+      const shkWps = row['ШК WPS'] || row['SHK_WPS']
+      const palletNo = row['Паллет №'] || row['Pallet_No']
+      const vlozhennost = row['Вложенность'] || row['Vlozhennost']
+      console.log(`  ${index}: Артикул="${artikul}", ШК WPS="${shkWps}", Паллет="${palletNo}", Вложенность="${vlozhennost}"`)
+    })
+    
+    // Агрегируем данные краткого отчета по Артикул + ШК WPS + Паллет №
+    const aggregatedDataSet1 = aggregateShortReport(dataSet1)
+    
     // Удаляем колонки ВП и Название задания из краткого отчета
-    const cleanedDataSet1 = removeFinalReportColumns(dataSet1)
+    const cleanedDataSet1 = removeFinalReportColumns(aggregatedDataSet1)
     const worksheet1 = XLSX.utils.json_to_sheet(cleanedDataSet1)
     autosizeColumns(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
     setCellFormatting(worksheet1, cleanedDataSet1, Object.keys(cleanedDataSet1[0] || {}))
@@ -860,59 +984,122 @@ const createOzonReport = (data: any[]): any[] => {
 interface PalletSummary {
   pallet_number: string
   places_count: number
+  articles_count: number
   renamed_number?: number
+}
+
+// Функция для создания сводки по паллетам
+// Интерфейс для сводки по паллетам
+interface PalletSummary {
+  pallet_number: string
+  places_count: number          // количество мест
+  articles_count: number        // количество уникальных артикулов
+  renamed_number?: number       // новый номер (для WB)
 }
 
 // Функция для создания сводки по паллетам
 const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   if (!data || data.length === 0) return []
-  
-  const palletGroups: { [key: string]: number } = {}
-  
-  // Группируем данные по номерам паллетов и считаем места
+
+  const palletGroups: {
+    [key: string]: {
+      shkWpsSet: Set<string>
+      articlesSet: Set<string>
+      placesByMesto: number
+    }
+  } = {}
+
   data.forEach(row => {
-    const palletNo = row['Pallet_No'] || row['Паллет №'] || 'Без паллета'
+    const palletNo =
+      row['Pallet_No'] ||
+      row['Паллет №'] ||
+      row['Паллет'] ||
+      'Без паллета'
+
+    if (!palletNo || palletNo === 'Без паллета') return
+
+    // все возможные варианты ШК WPS
+    const shkWps =
+      row['SHK_WPS'] ||
+      row['ШК WPS'] ||
+      row['shk_wps'] ||
+      row['ШК_WPS'] ||
+      row['ШК ВПС'] ||
+      row['SHK WPS'] ||
+      row['Shk_Wps'] ||
+      ''
+
+    const artikul = row['Artikul'] || row['Артикул'] || ''
     const mesto = Number(row['Mesto'] || row['Место'] || 0)
-    
-    if (palletNo && palletNo !== 'Без паллета') {
-      if (!palletGroups[palletNo]) {
-        palletGroups[palletNo] = 0
+
+    if (!palletGroups[palletNo]) {
+      palletGroups[palletNo] = {
+        shkWpsSet: new Set<string>(),
+        articlesSet: new Set<string>(),
+        placesByMesto: 0
       }
-      palletGroups[palletNo] += mesto
+    }
+
+    const group = palletGroups[palletNo]
+
+    // если есть ШК WPS — считаем по нему
+    if (shkWps && String(shkWps).trim() !== '') {
+      group.shkWpsSet.add(String(shkWps).trim())
+    }
+
+    // название артикула
+    if (artikul && String(artikul).trim() !== '') {
+      group.articlesSet.add(String(artikul).trim())
+    }
+
+    // fallback: суммируем Место,
+    // если нет ШК WPS в данных
+    if (!Number.isNaN(mesto) && mesto > 0) {
+      group.placesByMesto += mesto
     }
   })
-  
-  // Создаем массив сводки
-  const palletSummaries: PalletSummary[] = Object.entries(palletGroups).map(([palletNo, placesCount]) => ({
-    pallet_number: palletNo,
-    places_count: placesCount
-  }))
-  
-  // Сортируем по номеру паллета
+
+  // Собираем итоговую сводку
+  const palletSummaries: PalletSummary[] = Object.entries(palletGroups).map(
+    ([palletNo, group]) => {
+      const placesCount =
+        group.shkWpsSet.size > 0
+          ? group.shkWpsSet.size                // есть ШК — считаем по ним
+          : group.placesByMesto                 // нет ШК — считаем по «Место»
+
+      return {
+        pallet_number: palletNo,
+        places_count: placesCount,
+        articles_count: group.articlesSet.size
+      }
+    }
+  )
+
+  // сортировка по номеру паллета
   palletSummaries.sort((a, b) => {
     const aNum = parseInt(a.pallet_number) || 0
     const bNum = parseInt(b.pallet_number) || 0
     return aNum - bNum
   })
-  
-  // Для WB переименовываем номера паллетов в 1, 2, 3, 4...
+
+  // Для WB переименовываем паллеты в 1..N
   if (isWB) {
-    palletSummaries.forEach((summary, index) => {
-      summary.renamed_number = index + 1
-    })
-    
     return palletSummaries.map((summary, index) => ({
       'Оригинальный номер паллета': summary.pallet_number,
       'Новый номер паллета': index + 1,
-      'Количество мест': summary.places_count
+      'Количество мест': summary.places_count,
+      'Количество артикулов': summary.articles_count
     }))
   } else {
     return palletSummaries.map(summary => ({
       'Номер паллета': summary.pallet_number,
-      'Количество мест': summary.places_count
+      'Количество мест': summary.places_count,
+      'Количество артикулов': summary.articles_count
     }))
   }
 }
+
+
 
 // Функция для создания общей сводки по заданию
 const createTaskSummary = (data: any[]): any[] => {
@@ -945,6 +1132,232 @@ const createTaskSummary = (data: any[]): any[] => {
       'Значение': totalPallets.size > 0 ? Math.round(totalPlaces / totalPallets.size) : 0
     }
   ]
+}
+
+// Функция для агрегации краткого отчета по Артикул + ШК WPS + Паллет №
+// Функция для агрегации краткого отчета по Артикул + ШК WPS + Паллет №
+const aggregateShortReport = (data: any[]): any[] => {
+  if (!data || data.length === 0) return []
+
+  console.log('=== aggregateShortReport: Начало агрегации ===')
+  console.log('Исходное количество строк:', data.length)
+
+  if (data.length > 0) {
+    console.log('Доступные колонки:', Object.keys(data[0]))
+  }
+
+  // Группируем данные по ключу: Артикул + ШК WPS + Паллет №
+  const groupedData: { [key: string]: any } = {}
+
+  data.forEach((row, index) => {
+    const artikul = String(row['Артикул'] || row['Artikul'] || '').trim()
+    const shkWps  = String(row['ШК WPS'] || row['SHK_WPS'] || '').trim()
+    const palletNo = String(row['Паллет №'] || row['Pallet_No'] || '').trim()
+
+    // Вложенность
+    const vlozhennost = Number(row['Вложенность'] || row['Vlozhennost'] || 0)
+
+    // Количество товаров (оба варианта названия)
+    const quantity = Number(row['Количество товаров'] || row['Kolvo_Tovarov'] || 0)
+
+    const groupKey = `${artikul}|${shkWps}|${palletNo}`
+
+    if (index < 5) {
+      console.log(`Строка ${index}:`)
+      console.log(`  Артикул="${artikul}"`)
+      console.log(`  ШК WPS="${shkWps}"`)
+      console.log(`  Паллет №="${palletNo}"`)
+      console.log(`  Вложенность="${vlozhennost}"`)
+      console.log(`  Количество товаров="${quantity}"`)
+      console.log(`  Ключ группировки="${groupKey}"`)
+    }
+
+    if (!groupedData[groupKey]) {
+      // первая строка группы – копируем как базу
+      groupedData[groupKey] = { ...row }
+
+      // выставляем Вложенность
+      if (row['Вложенность'] !== undefined) {
+        groupedData[groupKey]['Вложенность'] = vlozhennost
+      }
+      if (row['Vlozhennost'] !== undefined) {
+        groupedData[groupKey]['Vlozhennost'] = vlozhennost
+      }
+
+      // выставляем Количество товаров
+      if (row['Количество товаров'] !== undefined) {
+        groupedData[groupKey]['Количество товаров'] = quantity
+      }
+      if (row['Kolvo_Tovarov'] !== undefined) {
+        groupedData[groupKey]['Kolvo_Tovarov'] = quantity
+      }
+
+      if (index < 5) {
+        console.log(`  -> Создана новая группа, Вложенность = ${vlozhennost}, Кол-во = ${quantity}`)
+      }
+    } else {
+      // суммируем Вложенность
+      const currentVlozhennost = Number(
+        groupedData[groupKey]['Вложенность'] ??
+        groupedData[groupKey]['Vlozhennost'] ??
+        0
+      )
+      const newVlozhennost = currentVlozhennost + vlozhennost
+
+      if (groupedData[groupKey]['Вложенность'] !== undefined || row['Вложенность'] !== undefined) {
+        groupedData[groupKey]['Вложенность'] = newVlozhennost
+      }
+      if (groupedData[groupKey]['Vlozhennost'] !== undefined || row['Vlozhennost'] !== undefined) {
+        groupedData[groupKey]['Vlozhennost'] = newVlozhennost
+      }
+
+      // суммируем Количество товаров
+      const currentQuantity = Number(
+        groupedData[groupKey]['Количество товаров'] ??
+        groupedData[groupKey]['Kolvo_Tovarov'] ??
+        0
+      )
+      const newQuantity = currentQuantity + quantity
+
+      if (groupedData[groupKey]['Количество товаров'] !== undefined || row['Количество товаров'] !== undefined) {
+        groupedData[groupKey]['Количество товаров'] = newQuantity
+      }
+      if (groupedData[groupKey]['Kolvo_Tovarov'] !== undefined || row['Kolvo_Tovarov'] !== undefined) {
+        groupedData[groupKey]['Kolvo_Tovarov'] = newQuantity
+      }
+
+      if (index < 5) {
+        console.log(
+          `  -> Обновлена группа: Вложенность ${currentVlozhennost} + ${vlozhennost} = ${newVlozhennost}, `
+          + `Кол-во ${currentQuantity} + ${quantity} = ${newQuantity}`
+        )
+      }
+    }
+  })
+
+  const result = Object.values(groupedData)
+
+  console.log('Первые 3 агрегированные строки:')
+  result.slice(0, 3).forEach((row: any, index) => {
+    const artikul = row['Артикул'] || row['Artikul']
+    const shkWps  = row['ШК WPS'] || row['SHK_WPS']
+    const palletNo = row['Паллет №'] || row['Pallet_No']
+    const vlozhennost = row['Вложенность'] || row['Vlozhennost']
+    const quantity = row['Количество товаров'] || row['Kolvo_Tovarov']
+    console.log(`${index}: Артикул=${artikul}, ШК WPS=${shkWps}, Паллет=${palletNo}, Вложенность=${vlozhennost}, Кол-во=${quantity}`)
+  })
+
+  console.log('Количество строк после агрегации:', result.length)
+  console.log('Сокращено строк:', data.length - result.length)
+  console.log('=== aggregateShortReport: Агрегация завершена ===')
+
+  return result
+}
+
+
+// Функция для извлечения уникальных ШК WPS из данных
+const extractUniqueShkWps = (data: any[]): string[] => {
+  if (!data || data.length === 0) {
+    console.log('extractUniqueShkWps: данные пустые')
+    return []
+  }
+  
+  // Логируем доступные колонки в первой строке
+  if (data.length > 0) {
+    console.log('=== extractUniqueShkWps: Доступные колонки ===')
+    console.log(Object.keys(data[0]))
+    
+    // Попробуем найти колонку, содержащую "WPS" или "ВПС"
+    const wpsColumns = Object.keys(data[0]).filter(key => 
+      key.toLowerCase().includes('wps') || 
+      key.toLowerCase().includes('впс') ||
+      key.toLowerCase().includes('шк') && (key.toLowerCase().includes('wps') || key.toLowerCase().includes('впс'))
+    )
+    console.log('Колонки, содержащие WPS/ВПС:', wpsColumns)
+  }
+  
+  const shkWpsSet = new Set<string>()
+  
+  // Все возможные варианты названий колонки ШК WPS
+  const shkWpsVariants = [
+    'SHK_WPS',
+    'ШК WPS',
+    'shk_wps',
+    'ШК_WPS',
+    'ШК ВПС',
+    'SHK WPS',
+    'Shk_Wps',
+    'SHKWPS',
+    'ShkWps',
+    'Shk_WPS',
+    'SHK_Wps'
+  ]
+  
+  let foundCount = 0
+  let foundColumn = ''
+  
+  data.forEach((row, index) => {
+    let found = false
+    
+    // Сначала ищем по известным вариантам
+    for (const variant of shkWpsVariants) {
+      const shkWps = row[variant]
+      
+      if (shkWps && String(shkWps).trim() !== '') {
+        shkWpsSet.add(String(shkWps).trim())
+        foundCount++
+        if (!foundColumn) {
+          foundColumn = variant
+        }
+        if (index < 3) {
+          console.log(`Строка ${index}: найден ШК WPS = "${shkWps}" в колонке "${variant}"`)
+        }
+        found = true
+        break
+      }
+    }
+    
+    // Если не нашли, ищем по всем ключам, содержащим WPS или ВПС
+    if (!found) {
+      for (const key of Object.keys(row)) {
+        const keyLower = key.toLowerCase()
+        if ((keyLower.includes('wps') || keyLower.includes('впс')) && 
+            (keyLower.includes('шк') || keyLower.includes('shk') || keyLower.includes('wps'))) {
+          const shkWps = row[key]
+          
+          if (shkWps && String(shkWps).trim() !== '') {
+            shkWpsSet.add(String(shkWps).trim())
+            foundCount++
+            if (!foundColumn) {
+              foundColumn = key
+            }
+            if (index < 3) {
+              console.log(`Строка ${index}: найден ШК WPS = "${shkWps}" в колонке "${key}" (найдено динамически)`)
+            }
+            break
+          }
+        }
+      }
+    }
+  })
+  
+  console.log(`Колонка с ШК WPS: "${foundColumn}"`)
+  console.log(`Всего найдено записей с ШК WPS: ${foundCount}`)
+  console.log(`Уникальных ШК WPS: ${shkWpsSet.size}`)
+  
+  // Преобразуем Set в массив и сортируем
+  return Array.from(shkWpsSet).sort((a, b) => {
+    // Пытаемся преобразовать в числа для правильной сортировки
+    const numA = Number(a)
+    const numB = Number(b)
+    
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return numA - numB
+    }
+    
+    // Если не числа, сортируем как строки
+    return a.localeCompare(b)
+  })
 }
 
 // Функция для расчета полного отчета ВБ (аналогично calculate_full_report из Python)
@@ -1332,7 +1745,8 @@ export const processShkCorobaExcel = async (file: File): Promise<ShkCorobaData[]
         }
         
         // Получаем список колонок из первой строки
-        const columns = Object.keys(jsonData[0])
+        const firstRow = jsonData[0] as Record<string, any>
+        const columns = Object.keys(firstRow)
         
         // Варианты названий для колонки "ШК WPS"
         const shkWpsVariants = [
