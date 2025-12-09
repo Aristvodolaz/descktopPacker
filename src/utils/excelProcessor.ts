@@ -744,7 +744,9 @@ export const createExcelWithTimeInfo = (
   }
 
   // Создаем отчеты с отклонениями для WB и Озон
-    const sourceData = dataSet2.length > 0 ? dataSet2 : dataSet1
+  // Для сводки по паллетам используем dataSet1 (там есть ШК WPS)
+  const sourceData = dataSet2.length > 0 ? dataSet2 : dataSet1
+  const sourceDataForPalletSummary = dataSet1.length > 0 ? dataSet1 : dataSet2
    
    // Определяем тип отчета Озон (isWB уже определен выше)
     const isOzon = taskName.toLowerCase().includes('ozon') || taskName.toLowerCase().includes('озон')
@@ -788,8 +790,9 @@ export const createExcelWithTimeInfo = (
   }
   
   // Создаем сводку по паллетам
-  if (sourceData.length > 0) {
-    const palletSummary = createPalletSummary(sourceData, isWB)
+  // Используем sourceDataForPalletSummary, т.к. в нём есть ШК WPS
+  if (sourceDataForPalletSummary.length > 0) {
+    const palletSummary = createPalletSummary(sourceDataForPalletSummary, isWB)
     if (palletSummary.length > 0) {
       let cleanedPalletSummary = removeFinalReportColumns(palletSummary) // Удаляем ВП и Название задания
       
@@ -810,7 +813,8 @@ export const createExcelWithTimeInfo = (
     }
     
     // Создаем общую сводку по заданию
-    const taskSummary = createTaskSummary(sourceData)
+    // Используем sourceDataForPalletSummary для корректного подсчёта
+    const taskSummary = createTaskSummary(sourceDataForPalletSummary)
     if (taskSummary.length > 0) {
       let cleanedTaskSummary = removeFinalReportColumns(taskSummary) // Удаляем ВП и Название задания
       
@@ -1005,6 +1009,7 @@ interface PalletSummary {
 }
 
 // Функция для создания сводки по паллетам
+// Количество мест рассчитывается по уникальным ШК ВПС (идентификаторам коробов)
 const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   if (!data || data.length === 0) return []
   
@@ -1019,6 +1024,24 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
       placesByMesto: number
     }
   } = {}
+
+  // Логируем первые 3 строки для проверки структуры данных
+  if (data.length > 0) {
+    console.log('=== Первые 3 строки данных для сводки по паллетам ===')
+    console.log('Всего строк в данных:', data.length)
+    console.log('Все колонки в первой строке:', Object.keys(data[0]))
+    
+    data.slice(0, 3).forEach((row, idx) => {
+      const shkWpsValue = row['SHK_WPS'] || row['ШК WPS'] || row['shk_wps'] || row['ШК_WPS'] || row['ШК ВПС'] || row['SHK WPS'] || row['Shk_Wps']
+      console.log(`Строка ${idx}:`, {
+        'Pallet_No/Паллет №': row['Pallet_No'] || row['Паллет №'] || row['Паллет'],
+        'SHK_WPS/ШК WPS (raw)': shkWpsValue,
+        'SHK_WPS/ШК WPS (trimmed)': shkWpsValue ? String(shkWpsValue).trim() : null,
+        'Artikul/Артикул': row['Artikul'] || row['Артикул'],
+        'Mesto/Место': row['Mesto'] || row['Место']
+      })
+    })
+  }
 
   data.forEach(row => {
     const palletNo =
@@ -1072,13 +1095,18 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   // Собираем итоговую сводку
   const palletSummaries: PalletSummary[] = Object.entries(palletGroups).map(
     ([palletNo, group]) => {
-      // Для WB: считаем по уникальным ШК WPS (если есть)
-      // Для Озона: ВСЕГДА сумма поля "Место"
-      const placesCount = isWB 
-        ? (group.shkWpsSet.size > 0 ? group.shkWpsSet.size : group.placesByMesto)  // WB: уникальные ШК WPS
-        : group.placesByMesto                                                       // Озон: сумма мест
+      // Для ВСЕХ типов отчетов: считаем по уникальным ШК WPS (коробам)
+      // ШК ВПС - это уникальные идентификаторы коробов
+      const placesCount = group.shkWpsSet.size > 0 
+        ? group.shkWpsSet.size   // Уникальные ШК WPS (представляют коробки)
+        : group.placesByMesto    // Fallback: сумма мест (если ШК WPS отсутствуют)
       
-      console.log(`Паллет ${palletNo}: Мест=${placesCount}, Уникальных ШК WPS=${group.shkWpsSet.size}, Артикулов=${group.articlesSet.size}, Сумма "Место"=${group.placesByMesto}`)
+      console.log(`Паллет ${palletNo}:`)
+      console.log(`  - Уникальных ШК WPS: ${group.shkWpsSet.size}`)
+      console.log(`  - Сумма "Место": ${group.placesByMesto}`)
+      console.log(`  - Количество артикулов: ${group.articlesSet.size}`)
+      console.log(`  - ИТОГОВОЕ количество мест: ${placesCount}`)
+      console.log(`  - Примеры ШК WPS (первые 3):`, Array.from(group.shkWpsSet).slice(0, 3))
 
       return {
         pallet_number: palletNo,
@@ -1089,6 +1117,16 @@ const createPalletSummary = (data: any[], isWB: boolean = false): any[] => {
   )
   
   console.log('Всего паллетов в сводке:', palletSummaries.length)
+  
+  // Итоговая статистика
+  const totalPlaces = palletSummaries.reduce((sum, p) => sum + p.places_count, 0)
+  const totalShkWps = Object.values(palletGroups).reduce((sum, g) => sum + g.shkWpsSet.size, 0)
+  const totalMesto = Object.values(palletGroups).reduce((sum, g) => sum + g.placesByMesto, 0)
+  
+  console.log('=== ИТОГОВАЯ СТАТИСТИКА ===')
+  console.log(`Общее количество мест в сводке: ${totalPlaces}`)
+  console.log(`Всего уникальных ШК WPS по всем паллетам: ${totalShkWps}`)
+  console.log(`Сумма "Место" по всем паллетам: ${totalMesto}`)
   console.log('=== createPalletSummary: Завершено ===')
   console.log('')
 
@@ -1123,17 +1161,38 @@ const createTaskSummary = (data: any[]): any[] => {
   if (!data || data.length === 0) return []
   
   const totalPallets = new Set()
-  let totalPlaces = 0
+  const uniqueShkWps = new Set()
+  let totalPlacesByMesto = 0
   
   data.forEach(row => {
     const palletNo = row['Pallet_No'] || row['Паллет №']
     const mesto = Number(row['Mesto'] || row['Место'] || 0)
     
+    // Все возможные варианты ШК WPS
+    const shkWps =
+      row['SHK_WPS'] ||
+      row['ШК WPS'] ||
+      row['shk_wps'] ||
+      row['ШК_WPS'] ||
+      row['ШК ВПС'] ||
+      row['SHK WPS'] ||
+      row['Shk_Wps'] ||
+      ''
+    
     if (palletNo && palletNo !== 'Без паллета') {
       totalPallets.add(palletNo)
     }
-    totalPlaces += mesto
+    
+    // Считаем уникальные ШК WPS
+    if (shkWps && String(shkWps).trim() !== '') {
+      uniqueShkWps.add(String(shkWps).trim())
+    }
+    
+    totalPlacesByMesto += mesto
   })
+  
+  // Используем уникальные ШК WPS если есть, иначе fallback на сумму "Место"
+  const totalPlaces = uniqueShkWps.size > 0 ? uniqueShkWps.size : totalPlacesByMesto
   
   return [
     {
