@@ -522,7 +522,26 @@ export const createExcelWithTimeInfo = (
   }
   
   // Определяем тип отчета по названию задания для предварительной обработки
-  const isWB = taskName.toLowerCase().includes('wb') || taskName.toLowerCase().includes('wildberries')
+  let isWB = taskName.toLowerCase().includes('wb') || taskName.toLowerCase().includes('wildberries')
+  const isOzon = taskName.toLowerCase().includes('ozon') || taskName.toLowerCase().includes('озон')
+  
+  // Для Озон отчетов проверяем TipPostavki
+  if (isOzon && mainDataSet.length > 0) {
+    // Ищем поле TipPostavki/Tip_Postavki в первой строке
+    const firstRow = mainDataSet[0]
+    const tipPostavki = firstRow['Tip_Postavki'] || firstRow['TipPostavki'] || firstRow['тип поставки']
+    
+    console.log('=== OZON REPORT: Проверка TipPostavki ===')
+    console.log('Значение TipPostavki:', tipPostavki)
+    
+    // Если TipPostavki = 1, обрабатываем как WB
+    if (tipPostavki === 1 || tipPostavki === '1') {
+      console.log('TipPostavki = 1 → Обрабатываем как WB (два листа)')
+      isWB = true
+    } else {
+      console.log('TipPostavki = 0 или не определен → Обрабатываем как Озон (один лист)')
+    }
+  }
   
   // Переименовываем колонки в обоих наборах
   if (dataSet1.length > 0) {
@@ -748,9 +767,11 @@ export const createExcelWithTimeInfo = (
   const sourceData = dataSet2.length > 0 ? dataSet2 : dataSet1
   const sourceDataForPalletSummary = dataSet1.length > 0 ? dataSet1 : dataSet2
    
-   // Определяем тип отчета Озон (isWB уже определен выше)
-    const isOzon = taskName.toLowerCase().includes('ozon') || taskName.toLowerCase().includes('озон')
+   // isWB и isOzon уже определены выше с учетом TipPostavki
+   // Для отчетов с отклонениями используем финальное значение isWB
   
+  // Создаем отчет с отклонениями
+  // Если isWB = true (включая случай когда Озон с TipPostavki = 1), создаем WB отчет
   if (isWB && sourceData.length > 0) {
     const wbReport = createWBReport(sourceData)
     if (wbReport.length > 0) {
@@ -763,8 +784,8 @@ export const createExcelWithTimeInfo = (
       XLSX.utils.book_append_sheet(workbook, wbWorksheet, 'WB Отклонения')
     }
   }
-  
-  if (isOzon && sourceData.length > 0) {
+  // Если это Озон с TipPostavki = 0, создаем Озон отчет
+  else if (isOzon && !isWB && sourceData.length > 0) {
     const ozonReport = createOzonReport(sourceData)
     if (ozonReport.length > 0) {
       const reorderedOzonReport = reorderColumns(ozonReport) // Применяем переупорядочивание колонок
@@ -775,9 +796,8 @@ export const createExcelWithTimeInfo = (
       XLSX.utils.book_append_sheet(workbook, ozonWorksheet, 'Озон Отклонения')
     }
   }
-  
   // Если не WB и не Озон, создаем общий отчет отклонений
-  if (!isWB && !isOzon && sourceData.length > 0) {
+  else if (!isWB && !isOzon && sourceData.length > 0) {
     const generalReport = createWBReport(sourceData) // Используем ту же логику
     if (generalReport.length > 0) {
       const reorderedGeneralReport = reorderColumns(generalReport) // Применяем переупорядочивание колонок
