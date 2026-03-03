@@ -522,24 +522,35 @@ export const createExcelWithTimeInfo = (
   }
   
   // Определяем тип отчета по названию задания для предварительной обработки
-  let isWB = taskName.toLowerCase().includes('wb') || taskName.toLowerCase().includes('wildberries')
-  const isOzon = taskName.toLowerCase().includes('ozon') || taskName.toLowerCase().includes('озон')
-  
-  // Для Озон отчетов проверяем TipPostavki
-  if (isOzon && mainDataSet.length > 0) {
-    // Ищем поле TipPostavki/Tip_Postavki в первой строке
+  const lowerTaskName = taskName.toLowerCase()
+  let isWB = lowerTaskName.includes('wb') || lowerTaskName.includes('wildberries')
+  const isOzon = lowerTaskName.includes('ozon') || lowerTaskName.includes('озон')
+  const isOzonKorob = isOzon && (lowerTaskName.includes('korob') || lowerTaskName.includes('короб'))
+  const isOzonPallet = isOzon && (lowerTaskName.includes('pallet') || lowerTaskName.includes('паллет'))
+
+  // 1) Ozon короб должен работать как WB независимо от TipPostavki
+  if (isOzonKorob) {
+    console.log('=== OZON REPORT: режим Ozon КОРОБ → обрабатываем как WB ===')
+    isWB = true
+  }
+  // 2) Ozon паллет должен работать как обычный Ozon (не WB), даже если TipPostavki = 1
+  else if (isOzonPallet) {
+    console.log('=== OZON REPORT: режим Ozon ПАЛЛЕТ → обрабатываем как Ozon ===')
+    // оставляем isWB = false
+  }
+  // 3) Обычный Ozon: режим выбираем по TipPostavki
+  else if (isOzon && mainDataSet.length > 0) {
     const firstRow = mainDataSet[0]
     const tipPostavki = firstRow['Tip_Postavki'] || firstRow['TipPostavki'] || firstRow['тип поставки']
-    
-    console.log('=== OZON REPORT: Проверка TipPostavki ===')
+
+    console.log('=== OZON REPORT: обычный Ozon, проверка TipPostavki ===')
     console.log('Значение TipPostavki:', tipPostavki)
-    
-    // Если TipPostavki = 1, обрабатываем как WB
+
     if (tipPostavki === 1 || tipPostavki === '1') {
       console.log('TipPostavki = 1 → Обрабатываем как WB (два листа)')
       isWB = true
     } else {
-      console.log('TipPostavki = 0 или не определен → Обрабатываем как Озон (один лист)')
+      console.log('TipPostavki = 0 или не определен → Обрабатываем как обычный Ozon')
     }
   }
   
