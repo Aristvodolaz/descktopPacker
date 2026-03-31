@@ -140,6 +140,44 @@ const processWBShortReport = (data: any[]): any[] => {
   })
 }
 
+// Функция для переноса срока годности из полного отчета в краткий
+const applyExpiryFromFullReport = (shortData: any[], fullData: any[]): any[] => {
+  if (shortData.length === 0 || fullData.length === 0) return shortData
+
+  // Строим индекс сроков годности по артикулу (берем первое непустое значение)
+  const expiryByArtikul = new Map<string, any>()
+  for (const row of fullData) {
+    const artikulRaw = row['Артикул'] ?? row['Artikul']
+    const expiry = row['Срок Годности'] ?? row['Srok_Godnosti']
+    const artikul = artikulRaw !== undefined && artikulRaw !== null ? String(artikulRaw).trim() : ''
+
+    if (artikul && expiry !== undefined && expiry !== null && String(expiry).trim() !== '' && !expiryByArtikul.has(artikul)) {
+      expiryByArtikul.set(artikul, expiry)
+    }
+  }
+
+  // Заполняем срок годности в кратком отчете, если он пустой
+  return shortData.map(row => {
+    const artikulRaw = row['Артикул'] ?? row['Artikul']
+    const artikul = artikulRaw !== undefined && artikulRaw !== null ? String(artikulRaw).trim() : ''
+    if (!artikul) return row
+
+    const currentExpiry = row['Срок Годности'] ?? row['Srok_Godnosti']
+    if (currentExpiry !== undefined && currentExpiry !== null && String(currentExpiry).trim() !== '') {
+      return row
+    }
+
+    const fullExpiry = expiryByArtikul.get(artikul)
+    if (fullExpiry === undefined) return row
+
+    return {
+      ...row,
+      'Срок Годности': fullExpiry,
+      'Srok_Godnosti': fullExpiry
+    }
+  })
+}
+
 // Функция для применения маппинга номеров паллетов к полному отчету ВБ
 const applyPalletNumberMapping = (fullReportData: any[], palletSummary: any[]): any[] => {
   if (!fullReportData || fullReportData.length === 0 || !palletSummary || palletSummary.length === 0) {
@@ -559,6 +597,12 @@ export const createExcelWithTimeInfo = (
     dataSet1 = removeExcludedColumns(dataSet1) // Удаляем исключенные колонки
     dataSet1 = renameColumns(dataSet1)
     
+    // Заполняем срок годности в кратком отчете из полного отчета
+    if (dataSet2.length > 0) {
+      const fullForExpiry = renameColumns(removeExcludedColumns(dataSet2))
+      dataSet1 = applyExpiryFromFullReport(dataSet1, fullForExpiry)
+    }
+
     // Специальная обработка для ВБ краткого отчета
     if (isWB) {
       dataSet1 = processWBShortReport(dataSet1) // Проставляем срок годности и удаляем записи без ШК_WPS
