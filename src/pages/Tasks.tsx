@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { createExcelWithTimeInfo } from '../utils/excelProcessor'
@@ -25,9 +25,11 @@ const tabs = [
 ]
 
 export default function Tasks() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabType>('in-progress')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
+  const [completedBulkSelected, setCompletedBulkSelected] = useState<Set<string>>(new Set())
   const [itemsPerPage, setItemsPerPage] = useState(10)
 
   const { data: tasksInProgress, isLoading: loadingInProgress, error: errorInProgress } = useQuery(
@@ -100,9 +102,32 @@ export default function Tasks() {
     setActiveTab(tabId)
     setSearchTerm('')
     setSelectedTask(null)
+    setCompletedBulkSelected(new Set())
     // Сбрасываем на первую страницу при смене вкладки
     pagination.goToPage(1)
   }
+
+  const toggleCompletedBulkSelect = (taskName: string) => {
+    setCompletedBulkSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskName)) next.delete(taskName)
+      else next.add(taskName)
+      return next
+    })
+  }
+
+  const selectAllCompletedOnPage = () => {
+    const names = pagination.currentData.map((task: any) =>
+      typeof task === 'string' ? task : task.Nazvanie_Zadaniya || ''
+    ).filter(Boolean)
+    setCompletedBulkSelected((prev) => {
+      const next = new Set(prev)
+      names.forEach((n) => next.add(n))
+      return next
+    })
+  }
+
+  const clearCompletedBulkSelect = () => setCompletedBulkSelected(new Set())
 
   const handleDownload = async (taskName: string) => {
     try {
@@ -140,9 +165,12 @@ export default function Tasks() {
       await hideTask(taskName)
       toast.dismiss()
       toast.success('Задание успешно скрыто')
-      
-      // Обновляем данные после скрытия
-      window.location.reload()
+      setCompletedBulkSelected((prev) => {
+        const next = new Set(prev)
+        next.delete(taskName)
+        return next
+      })
+      await queryClient.invalidateQueries('completed-tasks')
     } catch (error) {
       toast.dismiss()
       toast.error('Ошибка при скрытии задания')
@@ -150,10 +178,36 @@ export default function Tasks() {
     }
   }
 
+  const handleHideCompletedBulk = async () => {
+    const names = [...completedBulkSelected]
+    if (names.length === 0) return
+    toast.loading(`Скрытие заданий (${names.length})...`)
+    try {
+      const results = await Promise.allSettled(names.map((n) => hideTask(n)))
+      const ok = results.filter((r) => r.status === 'fulfilled').length
+      const fail = results.length - ok
+      toast.dismiss()
+      if (fail === 0) {
+        toast.success(`Скрыто заданий: ${ok}`)
+      } else {
+        toast.error(`Скрыто: ${ok}, ошибок: ${fail}`)
+      }
+      setCompletedBulkSelected(new Set())
+      await queryClient.invalidateQueries('completed-tasks')
+    } catch (error) {
+      toast.dismiss()
+      toast.error('Ошибка при скрытии заданий')
+      console.error('Hide bulk error:', error)
+    }
+  }
+
   const renderTaskItem = (task: any, index: number) => {
     const isInProgress = activeTab === 'in-progress'
     const taskName = typeof task === 'string' ? task : task.Nazvanie_Zadaniya || ''
-    const isSelected = selectedTask === taskName
+    const isCompletedBulkMode = activeTab === 'completed'
+    const isSelected = isCompletedBulkMode
+      ? completedBulkSelected.has(taskName)
+      : selectedTask === taskName
 
     return (
       <motion.div
@@ -168,9 +222,29 @@ export default function Tasks() {
             : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-soft'
           }
         `}
-        onClick={() => setSelectedTask(isSelected ? null : taskName)}
+        onClick={() => {
+          if (isCompletedBulkMode) {
+            toggleCompletedBulkSelect(taskName)
+          } else {
+            setSelectedTask(isSelected ? null : taskName)
+          }
+        }}
       >
         <div className="flex items-center justify-between">
+          {isCompletedBulkMode && (
+            <div
+              className="flex items-center mr-3 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={completedBulkSelected.has(taskName)}
+                onChange={() => toggleCompletedBulkSelect(taskName)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                aria-label={`Выбрать задание ${taskName}`}
+              />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h4 className="font-medium text-gray-900 truncate">
               {taskName}
@@ -307,6 +381,41 @@ export default function Tasks() {
               options={[5, 10, 20, 50]}
             />
           </div>
+          {activeTab === 'completed' && filteredTasks.length > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-sm text-gray-700">
+                Выбрано: <span className="font-medium">{completedBulkSelected.size}</span>
+                {completedBulkSelected.size > 0 && (
+                  <span className="text-gray-500"> — можно скрыть сразу несколько заданий</span>
+                )}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllCompletedOnPage}
+                  className="btn btn-secondary text-sm py-1.5 px-3"
+                >
+                  Выбрать все на странице
+                </button>
+                <button
+                  type="button"
+                  onClick={clearCompletedBulkSelect}
+                  disabled={completedBulkSelected.size === 0}
+                  className="btn btn-secondary text-sm py-1.5 px-3 disabled:opacity-50"
+                >
+                  Снять выбор
+                </button>
+                <button
+                  type="button"
+                  onClick={handleHideCompletedBulk}
+                  disabled={completedBulkSelected.size === 0}
+                  className="btn btn-primary text-sm py-1.5 px-3 disabled:opacity-50"
+                >
+                  Скрыть выбранные
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Task List */}
