@@ -129,6 +129,9 @@ export const reverseUploadColumnMappings: Record<string, string> = Object.fromEn
   Object.entries(uploadColumnMappings).map(([key, value]) => [value, key])
 )
 
+// Поддерживаем альтернативное название колонки из файлов пользователей
+reverseUploadColumnMappings['Упаковка товара в п/э пакет'] = 'Upakovka_v_PE_Paket'
+
 // Порядок колонок для отчета (соответствует изображению)
 export const desiredColumnOrder = [
   "ВП", "Название задания", "Артикул", "Артикул Сырья", "Название товара", "Номенклатура", "ШК", "ШК Сырья", 
