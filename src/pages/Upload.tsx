@@ -17,6 +17,44 @@ import { processUploadedExcel, processShkCorobaExcel, ShkCorobaData } from '../u
 // Тип для вкладок
 type TabType = 'tasks' | 'shkCoroba'
 
+const LDU_FLAG_FIELDS = [
+  'Sortiruemyi_Tovar',
+  'Ne_Sortiruemyi_Tovar',
+  'Produkty',
+  'Opasnyi_Tovar',
+  'Zakrytaya_Zona',
+  'Krupnogabaritnyi_Tovar',
+  'Yuvelirnye_Izdelia',
+  'Pechat_Etiketki_s_SHK',
+  'Pechat_Etiketki_s_Opisaniem',
+  'PriznakSortirovki',
+  'Upakovka_v_PE_Paket',
+  'Vlozhit_v_upakovku_pechatnyi_material',
+  'Izmerenie_VGH_i_peredacha_informatsii',
+  'Indeks_za_srochnost_koeff_1_5',
+  'Kompleksnaya_priemka_tovara',
+  'Priemka_tovara_v_transportnykh_korobakh',
+  'Priemka_tovara_palletnaya',
+  'Prochie_raboty_vklyuchaya_ustranenie_anomalii',
+  'Razbrakovka_tovara',
+  'Sborka_naborov_ot_2_shtuk_raznykh_tovarov',
+  'Upakovka_tovara_v_gofromeyler',
+  'Khranenie_tovara',
+  'Primeryka_SHK',
+  'Proverka_Sroka_Godnosti',
+  'Upakovka_v_Babl_Plenku',
+  'Upakovka_v_Ind_Korob',
+  'Markirovka_Tovara_Stiker_CHZ',
+  'Udalenie_Stikera_Markirovki',
+  'Dopolnitelnaya_Zashchita_Tovara',
+  'Markirovka_Transportnogo_Koroba',
+  'Formirovanie_Pallet_Otgruzki',
+  'Upakovochnyi_Material',
+  'Markirovka_Palleta_TM',
+  'Raskomplekt_Zakaza',
+  'Zamorozhennaya_Zona'
+]
+
 export default function Upload() {
   const [activeTab, setActiveTab] = useState<TabType>('tasks')
   const [selectedWarehouse, setSelectedWarehouse] = useState('')
@@ -50,31 +88,33 @@ export default function Upload() {
       // Обрабатываем Excel файл
       const rawData = await processUploadedExcel(file)
       
-      // Список исключенных колонок (должен совпадать с excelProcessor.ts)
+      // Список исключенных колонок для загрузки в БД
       const EXCLUDED_COLUMNS = [
+        // Старые тарифные поля больше не используем в мобильном клиенте
+        'Op_1_Bl_1_Sht',
+        'Op_2_Bl_2_Sht',
+        'Op_3_Bl_3_Sht',
+        'Op_4_Bl_4_Sht',
+        'Op_5_Bl_5_Sht',
+        'Op_6_Blis_6_10_Sht',
+        'Op_7_Pereschyot',
+        'Op_9_Fasovka_Sborka',
+        'Op_10_Markirovka_SHT',
+        'Op_11_Markirovka_Prom',
+        'Op_13_Markirovka_Fabr',
         'Op_14_TU_1_Sht',
         'Op_15_TU_2_Sht',
-        'Pechat_Etiketki_s_SHK',
-        'Pechat_Etiketki_s_Opisaniem',
-        'Kompleksnaya_priemka_tovara',
-        'Priemka_tovara_v_transportnykh_korobkakh',
-        'Priemka_tovara_v_transportnykh_korobakh', // вариант без h в конце
-        'Priemka_tovara_palletnaya',
-        'Razbrakovka_tovara'
-        // Убрали следующие колонки из исключений, чтобы они загружались корректно:
-        // 'Sortiruemyi_Tovar',
-        // 'Ne_Sortiruemyi_Tovar',
-        // 'Produkty',
-        // 'Opasnyi_Tovar',
-        // 'Zakrytaya_Zona',
-        // 'Krupnogabaritnyi_Tovar',
-        // 'Yuvelirnye_Izdelia',
-        // 'PriznakSortirovki'
+        'Op_16_TU_3_5',
+        'Op_17_TU_6_8',
+        'Op_468_Proverka_SHK',
+        'Op_469_Spetsifikatsiya_TM',
+        'Op_470_Dop_Upakovka',
+        'Priemka_tovara_v_transportnykh_korobkakh'
       ]
       
       // Преобразуем данные в нужный формат
       const processedData: UploadData[] = rawData.map((row: any) => {
-        // Создаем базовую структуру со всеми полями как в test.py
+        // Создаем базовую структуру с актуальными полями API/БД
         const processedRow: any = {
           // Базовые поля
           pref,
@@ -97,49 +137,51 @@ export default function Upload() {
           Tip_Postavki: null,
           Srok_Godnosti: null,
           
-          // Операции
-          Op_1_Bl_1_Sht: null,
-          Op_2_Bl_2_Sht: null,
-          Op_3_Bl_3_Sht: null,
-          Op_4_Bl_4_Sht: null,
-          Op_5_Bl_5_Sht: null,
-          Op_6_Blis_6_10_Sht: null,
-          Op_7_Pereschyot: null,
-          Op_9_Fasovka_Sborka: null,
-          Op_10_Markirovka_SHT: null,
-          Op_11_Markirovka_Prom: null,
-          Op_13_Markirovka_Fabr: null,
-          Op_16_TU_3_5: null,
-          Op_17_TU_6_8: null,
-          Zakrytaya_Zona: null,
-          Op_469_Spetsifikatsiya_TM: null,
-          Op_470_Dop_Upakovka: null,
-          
           // Дополнительные поля
           Mesto: null,
           Vlozhennost: null,
           Pallet_No: null,
+          tipPostavki: null,
+          Mono: null,
           Upakovka_v_Gofro: null,
           Upakovka_v_PE_Paket: null,
+          Tip_Operatsii_LDU: null,
           
-          // Характеристики товара
+          // Поля нового шаблона ЛДУ
           Sortiruemyi_Tovar: null,
           Ne_Sortiruemyi_Tovar: null,
           Produkty: null,
           Opasnyi_Tovar: null,
-          Op_468_Proverka_SHK: null,
+          Zakrytaya_Zona: null,
           Krupnogabaritnyi_Tovar: null,
           Yuvelirnye_Izdelia: null,
+          Pechat_Etiketki_s_SHK: null,
+          Pechat_Etiketki_s_Opisaniem: null,
           PriznakSortirovki: null,
-          
-          // Дополнительные операции
+          Kompleksnaya_priemka_tovara: null,
+          Priemka_tovara_v_transportnykh_korobakh: null,
+          Priemka_tovara_palletnaya: null,
           Vlozhit_v_upakovku_pechatnyi_material: null,
           Izmerenie_VGH_i_peredacha_informatsii: null,
           Indeks_za_srochnost_koeff_1_5: null,
           Prochie_raboty_vklyuchaya_ustranenie_anomalii: null,
+          Razbrakovka_tovara: null,
           Sborka_naborov_ot_2_shtuk_raznykh_tovarov: null,
           Upakovka_tovara_v_gofromeyler: null,
           Khranenie_tovara: null,
+          Primeryka_SHK: null,
+          Proverka_Sroka_Godnosti: null,
+          Upakovka_v_Babl_Plenku: null,
+          Upakovka_v_Ind_Korob: null,
+          Markirovka_Tovara_Stiker_CHZ: null,
+          Udalenie_Stikera_Markirovki: null,
+          Dopolnitelnaya_Zashchita_Tovara: null,
+          Markirovka_Transportnogo_Koroba: null,
+          Formirovanie_Pallet_Otgruzki: null,
+          Upakovochnyi_Material: null,
+          Markirovka_Palleta_TM: null,
+          Raskomplekt_Zakaza: null,
+          Zamorozhennaya_Zona: null,
           vp: null,
           Plan_Otkaz: null
         }
@@ -169,16 +211,21 @@ export default function Upload() {
           else if (['Artikul', 'Artikul_Syrya', 'SHK', 'SHK_Syrya', 'SHK_SPO'].includes(englishKey)) {
             processedRow[englishKey] = value ? String(value).trim() : null
           }
-          // Обрабатываем значения операций и сортировочные колонки
-          else if (englishKey.startsWith('Op_') || 
-              ['Ne_Sortiruemyi_Tovar', 'Opasnyi_Tovar', 
-               'Krupnogabaritnyi_Tovar', 'Yuvelirnye_Izdelia', 'Produkty', 
-               'Zakrytaya_Zona', 'PriznakSortirovki', 'Sortiruemyi_Tovar'].includes(englishKey)) {
+          // Флаги ЛДУ приводим к 0/1-совместимому виду
+          else if (LDU_FLAG_FIELDS.includes(englishKey)) {
             processedRow[englishKey] = processOpColumnValue(value)
-          } 
+          }
+          // Логические флаги доставки
+          else if (['tipPostavki', 'Mono'].includes(englishKey)) {
+            processedRow[englishKey] = processOpColumnValue(value)
+          }
+          // Тип операции в ЛДУ оставляем строкой
+          else if (englishKey === 'Tip_Operatsii_LDU') {
+            processedRow[englishKey] = String(value).trim()
+          }
           // Специальная обработка для поля Upakovka_v_Gofro - оставляем как строку
           else if (englishKey === 'Upakovka_v_Gofro') {
-            processedRow[englishKey] = String(value)
+            processedRow[englishKey] = String(value).trim()
           } 
           // Для остальных полей оставляем как строку
           else {

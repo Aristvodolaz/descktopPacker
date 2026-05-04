@@ -33,6 +33,8 @@ export interface UploadData {
   Itog_Zakaz?: number
   SOH?: number
   Tip_Postavki?: string
+  tipPostavki?: string
+  Mono?: string
   Srok_Godnosti?: string
   
   // Operations
@@ -63,28 +65,44 @@ export interface UploadData {
   Nazvanie_Zadaniya: string
   Upakovka_v_Gofro?: string
   Upakovka_v_PE_Paket?: string
+  Tip_Operatsii_LDU?: string
   
   // Product characteristics
   Sortiruemyi_Tovar?: string
   Ne_Sortiruemyi_Tovar?: string
   Produkty?: string
   Opasnyi_Tovar?: string
-  Op_468_Proverka_SHK?: string
   Krupnogabaritnyi_Tovar?: string
   Yuvelirnye_Izdelia?: string
-  Zakrytaya_Zona?: string
   Pechat_Etiketki_s_SHK?: string
   Pechat_Etiketki_s_Opisaniem?: string
   PriznakSortirovki?: string
   
   // Additional operations
+  Kompleksnaya_priemka_tovara?: string
+  Priemka_tovara_v_transportnykh_korobakh?: string
+  Priemka_tovara_palletnaya?: string
   Vlozhit_v_upakovku_pechatnyi_material?: string
   Izmerenie_VGH_i_peredacha_informatsii?: string
   Indeks_za_srochnost_koeff_1_5?: string
   Prochie_raboty_vklyuchaya_ustranenie_anomalii?: string
+  Razbrakovka_tovara?: string
   Sborka_naborov_ot_2_shtuk_raznykh_tovarov?: string
   Upakovka_tovara_v_gofromeyler?: string
   Khranenie_tovara?: string
+  Primeryka_SHK?: string
+  Proverka_Sroka_Godnosti?: string
+  Upakovka_v_Babl_Plenku?: string
+  Upakovka_v_Ind_Korob?: string
+  Markirovka_Tovara_Stiker_CHZ?: string
+  Udalenie_Stikera_Markirovki?: string
+  Dopolnitelnaya_Zashchita_Tovara?: string
+  Markirovka_Transportnogo_Koroba?: string
+  Formirovanie_Pallet_Otgruzki?: string
+  Upakovochnyi_Material?: string
+  Markirovka_Palleta_TM?: string
+  Raskomplekt_Zakaza?: string
+  Zamorozhennaya_Zona?: string
   vp?: string
   Plan_Otkaz?: number
 }
