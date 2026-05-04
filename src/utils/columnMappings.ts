@@ -12,6 +12,7 @@ export const uploadColumnMappings: Record<string, string> = {
   'Pechat_Etiketki_s_SHK': 'Печать этикетки с ШК',
   'Pechat_Etiketki_s_Opisaniem': 'Печать этикетки с описанием',
   'PriznakSortirovki': 'Сортировка товара по признаку',
+  /** Каноническое поле БД; в WB для той же сущности колонка «Фасовка/сборка товара в короб» — см. reverse */
   'Upakovka_v_Gofro': 'Упаковка в гофро',
   'Upakovka_v_PE_Paket': 'Упаковка товара в п/э пакет',
   'Spetsifikatsiya_TM': 'Спецификация ТМ',
@@ -58,7 +59,10 @@ export const uploadColumnMappings: Record<string, string> = {
   'Mono': 'Mono',
   'Srok_Godnosti': 'Срок Годности',
   'vp': 'ВП',
-  
+  'Mesto': 'Место',
+  'Vlozhennost': 'Вложенность',
+  'Pallet_No': 'Паллет №',
+
   // Дополнительные поля для времени и комментариев
   'reason': 'Причина',
   'comment': 'Комментарий',
@@ -162,6 +166,22 @@ reverseUploadColumnMappings['Тип поставки'] = 'Tip_Postavki'
 reverseUploadColumnMappings['тип поставки'] = 'Tip_Postavki'
 reverseUploadColumnMappings['МОНО'] = 'Mono'
 reverseUploadColumnMappings['Моно'] = 'Mono'
+
+// Шаблон WB (в т.ч. «Южный кластер»): подписи столбцов отличаются от канонических в uploadColumnMappings
+reverseUploadColumnMappings['Спецификация транспортного паллета (для маркеплейсов)'] =
+  'Spetsifikatsiya_TM'
+reverseUploadColumnMappings['Формирование транспортного паллета для отгрузки'] =
+  'Formirovanie_Pallet_Otgruzki'
+reverseUploadColumnMappings['Вложить печатный материал'] = 'Vlozhit_v_upakovku_pechatnyi_material'
+reverseUploadColumnMappings['Приемка в транспортных коробах'] =
+  'Priemka_tovara_v_transportnykh_korobakh'
+reverseUploadColumnMappings['Паллетная приемка'] = 'Priemka_tovara_palletnaya'
+reverseUploadColumnMappings['Прочие работы (в т.ч. устранение аномалий)'] =
+  'Prochie_raboty_vklyuchaya_ustranenie_anomalii'
+
+// Колонки Test_MP без отдельного поля клиента — только реальные имена БД
+reverseUploadColumnMappings['Фасовка/сборка товара в короб'] = 'Upakovka_v_Gofro'
+reverseUploadColumnMappings['Проверка ШК'] = 'Primeryka_SHK'
 
 /** Убирает null/undefined из объекта перед POST — чтобы сработали дефолты сервера (upload-data-new). */
 export function omitEmptyUploadFields(

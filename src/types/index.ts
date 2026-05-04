@@ -75,6 +75,7 @@ export interface UploadData {
   Prochie_raboty_vklyuchaya_ustranenie_anomalii?: string
   Razbrakovka_tovara?: string
   Sborka_naborov_ot_2_shtuk_raznykh_tovarov?: string
+  /** Колонка «Фасовка/сборка товара в короб» (WB) мапится на Upakovka_v_Gofro при загрузке */
   Upakovka_tovara_v_gofromeyler?: string
   Khranenie_tovara?: string
   Primeryka_SHK?: string

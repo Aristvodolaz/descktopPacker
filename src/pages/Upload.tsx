@@ -31,6 +31,7 @@ const LDU_FLAG_FIELDS = [
   'Pechat_Etiketki_s_SHK',
   'Pechat_Etiketki_s_Opisaniem',
   'PriznakSortirovki',
+  'Upakovka_v_Gofro',
   'Upakovka_v_PE_Paket',
   'Vlozhit_v_upakovku_pechatnyi_material',
   'Izmerenie_VGH_i_peredacha_informatsii',
@@ -192,8 +193,9 @@ export default function Upload() {
 
         // Обрабатываем каждую колонку из Excel
         for (const [key, value] of Object.entries(row)) {
+          const colKey = typeof key === 'string' ? key.trim() : key
           // Получаем английское название колонки
-          const englishKey = reverseUploadColumnMappings[key] || key
+          const englishKey = reverseUploadColumnMappings[colKey] || colKey
           
           // Пропускаем исключенные колонки
           if (EXCLUDED_COLUMNS.includes(englishKey)) {
@@ -227,10 +229,6 @@ export default function Upload() {
           else if (englishKey === 'Tip_Operatsii_LDU') {
             processedRow[englishKey] = String(value).trim()
           }
-          // Специальная обработка для поля Upakovka_v_Gofro - оставляем как строку
-          else if (englishKey === 'Upakovka_v_Gofro') {
-            processedRow[englishKey] = String(value).trim()
-          } 
           // Для остальных полей оставляем как строку
           else {
             processedRow[englishKey] = String(value)

@@ -1827,11 +1827,13 @@ export const processUploadedExcel = async (file: File): Promise<any[]> => {
         const processedData = jsonData.map((row: any) => {
           const processedRow: any = {}
           for (const [key, value] of Object.entries(row)) {
+            // Trim заголовков: в шаблонах WB бывает «Вложенность » с пробелом в конце
+            const colKey = typeof key === 'string' ? key.trim() : key
             if (value === null || value === undefined || value === '' || 
                 String(value).trim() === '' || String(value) === 'NaN') {
-              processedRow[key] = null
+              processedRow[colKey] = null
             } else {
-              processedRow[key] = value
+              processedRow[colKey] = value
             }
           }
           return processedRow
