@@ -33,7 +33,7 @@ export const getUploadedTasks = async (): Promise<string[]> => {
   return response.data.tasks || []
 }
 
-// Upload
+// Upload — POST /upload-data-new (текущий контракт service-komus, Test_MP)
 export const uploadRowData = async (data: UploadData): Promise<void> => {
   await api.post('/upload-data-new', data)
 }

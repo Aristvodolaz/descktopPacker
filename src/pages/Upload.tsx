@@ -11,11 +11,14 @@ import {
 } from '@heroicons/react/24/outline'
 import { getWarehouses, uploadRowData, checkTaskExists, updateShkCoroba } from '../utils/api'
 import { UploadData, UploadProgress } from '../types'
-import { processOpColumnValue, reverseUploadColumnMappings } from '../utils/columnMappings'
+import { processOpColumnValue, reverseUploadColumnMappings, omitEmptyUploadFields } from '../utils/columnMappings'
 import { processUploadedExcel, processShkCorobaExcel, ShkCorobaData } from '../utils/excelProcessor'
 
 // Тип для вкладок
 type TabType = 'tasks' | 'shkCoroba'
+
+// Тип поставки (колонка) и BIT-поля tipPostavki / Mono — в JSON должны присутствовать (см. service-komus)
+const TIP_POSTAVKI_MONO_FIELDS = ['Tip_Postavki', 'tipPostavki', 'Mono']
 
 const LDU_FLAG_FIELDS = [
   'Sortiruemyi_Tovar',
@@ -52,7 +55,8 @@ const LDU_FLAG_FIELDS = [
   'Upakovochnyi_Material',
   'Markirovka_Palleta_TM',
   'Raskomplekt_Zakaza',
-  'Zamorozhennaya_Zona'
+  'Zamorozhennaya_Zona',
+  'Spetsifikatsiya_TM'
 ]
 
 export default function Upload() {
@@ -108,8 +112,7 @@ export default function Upload() {
         'Op_17_TU_6_8',
         'Op_468_Proverka_SHK',
         'Op_469_Spetsifikatsiya_TM',
-        'Op_470_Dop_Upakovka',
-        'Priemka_tovara_v_transportnykh_korobkakh'
+        'Op_470_Dop_Upakovka'
       ]
       
       // Преобразуем данные в нужный формат
@@ -135,17 +138,18 @@ export default function Upload() {
           Itog_Zakaz: null,
           SOH: null,
           Tip_Postavki: null,
+          tipPostavki: null,
+          Mono: null,
           Srok_Godnosti: null,
           
           // Дополнительные поля
           Mesto: null,
           Vlozhennost: null,
           Pallet_No: null,
-          tipPostavki: null,
-          Mono: null,
           Upakovka_v_Gofro: null,
           Upakovka_v_PE_Paket: null,
           Tip_Operatsii_LDU: null,
+          Spetsifikatsiya_TM: null,
           
           // Поля нового шаблона ЛДУ
           Sortiruemyi_Tovar: null,
@@ -215,8 +219,8 @@ export default function Upload() {
           else if (LDU_FLAG_FIELDS.includes(englishKey)) {
             processedRow[englishKey] = processOpColumnValue(value)
           }
-          // Логические флаги доставки
-          else if (['tipPostavki', 'Mono'].includes(englishKey)) {
+          // Тип поставки (колонка), tipPostavki, Mono — строки 0/1 как на бэкенде
+          else if (TIP_POSTAVKI_MONO_FIELDS.includes(englishKey)) {
             processedRow[englishKey] = processOpColumnValue(value)
           }
           // Тип операции в ЛДУ оставляем строкой
@@ -278,7 +282,9 @@ export default function Upload() {
               console.log('Ключи объекта:', Object.keys(data[i]))
             }
             
-            await uploadRowData(data[i])
+            await uploadRowData(
+              omitEmptyUploadFields(data[i], TIP_POSTAVKI_MONO_FIELDS) as unknown as UploadData
+            )
             success = true
             
             setUploadProgress(prev => ({

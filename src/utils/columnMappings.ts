@@ -1,4 +1,5 @@
-// Маппинг колонок для загрузки (английские названия -> русские)
+// Маппинг колонок для загрузки (английские названия -> русские подписи Excel)
+// Совпадает с utils/lduUploadMapping.js на service-komus (applyLduExcelHeaders)
 export const uploadColumnMappings: Record<string, string> = {
   // Поля нового шаблона ЛДУ
   'Sortiruemyi_Tovar': 'Сортируемый товар',
@@ -12,7 +13,8 @@ export const uploadColumnMappings: Record<string, string> = {
   'Pechat_Etiketki_s_Opisaniem': 'Печать этикетки с описанием',
   'PriznakSortirovki': 'Сортировка товара по признаку',
   'Upakovka_v_Gofro': 'Упаковка в гофро',
-  'Upakovka_v_PE_Paket': 'Упаковка в п/э пакет',
+  'Upakovka_v_PE_Paket': 'Упаковка товара в п/э пакет',
+  'Spetsifikatsiya_TM': 'Спецификация ТМ',
   'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
   'Izmerenie_VGH_i_peredacha_informatsii': 'Измерение ВГХ и передача информации',
   'Indeks_za_srochnost_koeff_1_5': 'Индекс за срочность (коэффициент 1,5)',
@@ -21,25 +23,25 @@ export const uploadColumnMappings: Record<string, string> = {
   'Priemka_tovara_palletnaya': 'Паллетная приёмка',
   'Prochie_raboty_vklyuchaya_ustranenie_anomalii': 'Прочие работы включая устранение аномалий',
   'Razbrakovka_tovara': 'Разбраковка товара',
-  'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов от 2 штук разных товаров',
+  'Sborka_naborov_ot_2_shtuk_raznykh_tovarov':
+    'Формирование наборов (комплектов) от 2-х ед. товара',
   'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
   'Khranenie_tovara': 'Хранение товара',
   'Primeryka_SHK': 'Примерка ШК',
   'Proverka_Sroka_Godnosti': 'Проверка срока годности',
-  'Upakovka_v_Babl_Plenku': 'Упаковка в бабл-плёнку',
-  'Upakovka_v_Ind_Korob': 'Упаковка в инд. короб',
-  'Markirovka_Tovara_Stiker_CHZ': 'Маркировка товара (стикер, ЧЗ и т.п.)',
-  'Udalenie_Stikera_Markirovki': 'Удаление стикера/маркировки',
+  'Upakovka_v_Babl_Plenku': 'Упаковка в бабл пленку',
+  'Upakovka_v_Ind_Korob': 'Упаковка товара в индивидуальный короб',
+  'Markirovka_Tovara_Stiker_CHZ':
+    'Маркировка товара (стикером, ЧЗ, противокражной этикеткой)',
+  'Udalenie_Stikera_Markirovki': 'Удаление стикера/маркировки с товара',
   'Dopolnitelnaya_Zashchita_Tovara': 'Дополнительная защита товара',
   'Markirovka_Transportnogo_Koroba': 'Маркировка транспортного короба',
   'Formirovanie_Pallet_Otgruzki': 'Формирование паллет для отгрузки',
   'Upakovochnyi_Material': 'Упаковочный материал',
-  'Markirovka_Palleta_TM': 'Маркировка паллета (ТМ)',
-  'Raskomplekt_Zakaza': 'Раскомплект заказа',
+  'Markirovka_Palleta_TM': 'Маркировка паллета (транспортного модуля)',
+  'Raskomplekt_Zakaza': 'Раскомплект заказа (полный/частичный)',
   'Tip_Operatsii_LDU': 'Тип операции',
   'Zamorozhennaya_Zona': 'Замороженная зона',
-  'tipPostavki': 'tipPostavki',
-  'Mono': 'Mono',
 
   // Основные поля
   'Artikul': 'Артикул',
@@ -51,6 +53,9 @@ export const uploadColumnMappings: Record<string, string> = {
   'Kol_vo_Syrya': 'Кол-во сырья',
   'Itog_Zakaz': 'Итог Заказ',
   'SOH': 'СОХ',
+  'Tip_Postavki': 'тип поставки',
+  'tipPostavki': 'tipPostavki',
+  'Mono': 'Mono',
   'Srok_Godnosti': 'Срок Годности',
   'vp': 'ВП',
   
@@ -137,10 +142,49 @@ export const reverseUploadColumnMappings: Record<string, string> = Object.fromEn
   Object.entries(uploadColumnMappings).map(([key, value]) => [value, key])
 )
 
-// Поддерживаем альтернативное название колонки из файлов пользователей
+// Варианты заголовков из старых шаблонов Excel (не перезаписывают канонические ключи выше)
 reverseUploadColumnMappings['Упаковка товара в п/э пакет'] = 'Upakovka_v_PE_Paket'
 reverseUploadColumnMappings['Упаковка в ПЭ пакет'] = 'Upakovka_v_PE_Paket'
+reverseUploadColumnMappings['Упаковка в п/э пакет'] = 'Upakovka_v_PE_Paket'
 reverseUploadColumnMappings['Тип операции'] = 'Tip_Operatsii_LDU'
+reverseUploadColumnMappings['Упаковка в бабл-плёнку'] = 'Upakovka_v_Babl_Plenku'
+reverseUploadColumnMappings['Упаковка в бабл - пленку'] = 'Upakovka_v_Babl_Plenku'
+reverseUploadColumnMappings['Упаковка в инд. короб'] = 'Upakovka_v_Ind_Korob'
+reverseUploadColumnMappings['Сборка наборов от 2 штук разных товаров'] =
+  'Sborka_naborov_ot_2_shtuk_raznykh_tovarov'
+reverseUploadColumnMappings['Маркировка товара (стикер, ЧЗ и т.п.)'] =
+  'Markirovka_Tovara_Stiker_CHZ'
+reverseUploadColumnMappings['Удаление стикера/маркировки'] = 'Udalenie_Stikera_Markirovki'
+reverseUploadColumnMappings['Раскомплект заказа'] = 'Raskomplekt_Zakaza'
+reverseUploadColumnMappings['Маркировка паллета (ТМ)'] = 'Markirovka_Palleta_TM'
+// Тип поставки / моно (русские и латинские заголовки)
+reverseUploadColumnMappings['Тип поставки'] = 'Tip_Postavki'
+reverseUploadColumnMappings['тип поставки'] = 'Tip_Postavki'
+reverseUploadColumnMappings['МОНО'] = 'Mono'
+reverseUploadColumnMappings['Моно'] = 'Mono'
+
+/** Убирает null/undefined из объекта перед POST — чтобы сработали дефолты сервера (upload-data-new). */
+export function omitEmptyUploadFields(
+  row: object,
+  /** Ключи, которые всегда должны попасть в JSON (в т.ч. как null) */
+  alwaysIncludeKeys?: string[]
+): Record<string, unknown> {
+  const always = new Set(alwaysIncludeKeys ?? [])
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(row)) {
+    if (v !== null && v !== undefined) {
+      out[k] = v
+    } else if (always.has(k)) {
+      out[k] = null
+    }
+  }
+  for (const k of always) {
+    if (!(k in out)) {
+      out[k] = null
+    }
+  }
+  return out
+}
 
 // Порядок колонок для отчета (соответствует изображению)
 export const desiredColumnOrder = [

@@ -32,28 +32,13 @@ export interface UploadData {
   Kol_vo_Syrya?: number
   Itog_Zakaz?: number
   SOH?: number
+  /** Колонка из Excel / задания (часто 0/1) */
   Tip_Postavki?: string
+  /** BIT: сервер может также вычислять из имени файла; ключ должен быть в контракте */
   tipPostavki?: string
+  /** BIT: признак МОНО в задании */
   Mono?: string
   Srok_Godnosti?: string
-  
-  // Operations
-  Op_1_Bl_1_Sht?: string
-  Op_2_Bl_2_Sht?: string
-  Op_3_Bl_3_Sht?: string
-  Op_4_Bl_4_Sht?: string
-  Op_5_Bl_5_Sht?: string
-  Op_6_Blis_6_10_Sht?: string
-  Op_7_Pereschyot?: string
-  Op_9_Fasovka_Sborka?: string
-  Op_10_Markirovka_SHT?: string
-  Op_11_Markirovka_Prom?: string
-  Op_13_Markirovka_Fabr?: string
-  Op_16_TU_3_5?: string
-  Op_17_TU_6_8?: string
-  Zakrytaya_Zona?: string
-  Op_469_Spetsifikatsiya_TM?: string
-  Op_470_Dop_Upakovka?: string
   
   Mesto?: string
   Vlozhennost?: number
@@ -66,12 +51,14 @@ export interface UploadData {
   Upakovka_v_Gofro?: string
   Upakovka_v_PE_Paket?: string
   Tip_Operatsii_LDU?: string
+  Spetsifikatsiya_TM?: string
   
   // Product characteristics
   Sortiruemyi_Tovar?: string
   Ne_Sortiruemyi_Tovar?: string
   Produkty?: string
   Opasnyi_Tovar?: string
+  Zakrytaya_Zona?: string
   Krupnogabaritnyi_Tovar?: string
   Yuvelirnye_Izdelia?: string
   Pechat_Etiketki_s_SHK?: string
