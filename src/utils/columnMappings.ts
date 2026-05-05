@@ -105,6 +105,22 @@ export const downloadColumnMappings: Record<string, string> = {
   'Sborka_naborov_ot_2_shtuk_raznykh_tovarov': 'Сборка наборов (комплектов) от 2-х штук разных товаров',
   'Upakovka_tovara_v_gofromeyler': 'Упаковка товара в гофромейлер',
   'Khranenie_tovara': 'Хранение товара',
+  // Технические ключи полного отчета -> русские заголовки (по эталону)
+  'Primeryka_SHK': 'Проверка ШК',
+  'Proverka_Sroka_Godnosti': 'Проверка срока годности',
+  'Upakovka_v_Babl_Plenku': 'Упаковка в бабл - пленку',
+  'Upakovka_v_Ind_Korob': 'Упаковка товара в индивидуальный короб',
+  'Markirovka_Tovara_Stiker_CHZ': 'Маркировка товара (стикером, ЧЗ, противокражной этикеткой)',
+  'Udalenie_Stikera_Markirovki': 'Удаление стикера/маркировки с товара',
+  'Dopolnitelnaya_Zashchita_Tovara': 'Дополнительная защита товара',
+  'Markirovka_Transportnogo_Koroba': 'Маркировка транспортного короба',
+  'Spetsifikatsiya_TM': 'Спецификация транспортного паллета (для маркеплейсов)',
+  'Formirovanie_Pallet_Otgruzki': 'Формирование транспортного паллета для отгрузки',
+  'Upakovochnyi_Material': 'Упаковочный материал',
+  'Markirovka_Palleta_TM': 'Маркировка паллета (транспортного модуля)',
+  'Raskomplekt_Zakaza': 'Раскомплект заказа (полный/частичный)',
+  'Tip_Operatsii_LDU': 'Тип операции',
+  'Zamorozhennaya_Zona': 'Замороженная зона',
   
   
   // Основные поля
