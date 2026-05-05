@@ -347,8 +347,13 @@ const filterData = (data: any[]): any[] => {
 }
 
 // Функция для переупорядочивания колонок по шаблону
-const reorderColumns = (data: any[]): any[] => {
+const reorderColumns = (
+  data: any[],
+  options: { strictTemplate?: boolean } = {}
+): any[] => {
   if (data.length === 0) return data
+
+  const { strictTemplate = true } = options
 
   // Индекс: русское имя колонки -> возможные английские ключи из источника
   const russianToEnglishKeys = Object.entries(downloadColumnMappings).reduce<Record<string, string[]>>(
@@ -364,16 +369,36 @@ const reorderColumns = (data: any[]): any[] => {
   
   return data.map(row => {
     const reorderedRow: any = {}
+    const processedKeys = new Set<string>()
     
     // Добавляем колонки в нужном порядке.
-    // Если колонки нет в строке, оставляем ее пустой, чтобы структура отчета была фиксированной.
+    // В strictTemplate режиме (полный отчет) добавляем все колонки шаблона, даже если они пустые.
+    // В мягком режиме (краткий отчет) добавляем только реально присутствующие колонки.
     for (const col of desiredColumnOrder) {
       if (row.hasOwnProperty(col)) {
         reorderedRow[col] = row[col]
+        processedKeys.add(col)
       } else {
         const englishCandidates = russianToEnglishKeys[col] || []
         const matchedEnglishKey = englishCandidates.find((key) => row.hasOwnProperty(key))
-        reorderedRow[col] = matchedEnglishKey ? row[matchedEnglishKey] : ''
+
+        if (matchedEnglishKey) {
+          reorderedRow[col] = row[matchedEnglishKey]
+          processedKeys.add(matchedEnglishKey)
+          processedKeys.add(col)
+        } else if (strictTemplate) {
+          reorderedRow[col] = ''
+          processedKeys.add(col)
+        }
+      }
+    }
+
+    // В мягком режиме сохраняем оставшиеся исходные колонки.
+    if (!strictTemplate) {
+      for (const key of Object.keys(row)) {
+        if (!processedKeys.has(key)) {
+          reorderedRow[key] = row[key]
+        }
       }
     }
 
@@ -601,6 +626,9 @@ export const createExcelWithTimeInfo = (
   }
   
   // Переименовываем колонки в обоих наборах
+  // ВАЖНО: для расчета полного WB отчета сохраняем версию краткого отчета
+  // до reorderColumns, чтобы не потерять служебные поля (например, "Количество товаров").
+  let dataSet1ForWBFullCalculation: any[] = []
   if (dataSet1.length > 0) {
     dataSet1 = removeExcludedColumns(dataSet1) // Удаляем исключенные колонки
     dataSet1 = renameColumns(dataSet1)
@@ -616,14 +644,18 @@ export const createExcelWithTimeInfo = (
       dataSet1 = processWBShortReport(dataSet1) // Проставляем срок годности и удаляем записи без ШК_WPS
       dataSet1 = removeOzonColumnsForWB(dataSet1) // Удаляем колонки Озона для ВБ
     }
+
+    // Используем эту версию для calculateWBFullReport (до финального reorder)
+    dataSet1ForWBFullCalculation = JSON.parse(JSON.stringify(dataSet1))
     
-    dataSet1 = reorderColumns(dataSet1) // Переупорядочиваем колонки
+    // Для краткого отчета не добавляем пустые колонки из полного шаблона
+    dataSet1 = reorderColumns(dataSet1, { strictTemplate: false }) // Переупорядочиваем колонки
   }
   
   // Для WB: обрабатываем полный отчет с данными из краткого отчета
-  if (isWB && dataSet1.length > 0 && dataSet2.length > 0) {
+  if (isWB && dataSet1ForWBFullCalculation.length > 0 && dataSet2.length > 0) {
     // Используем новую функцию для расчета полного отчета ВБ
-    dataSet2 = calculateWBFullReport(dataSet1, dataSet2)
+    dataSet2 = calculateWBFullReport(dataSet1ForWBFullCalculation, dataSet2)
     
     // После обработки применяем стандартную обработку
     dataSet2 = removeExcludedColumns(dataSet2)
@@ -1542,7 +1574,12 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
       standardizedRow['Artikul'] = row['Артикул'] || row['Artikul'] || null
       
       // Количество товаров - ОБЯЗАТЕЛЬНО устанавливаем значение
-      standardizedRow['Kolvo_Tovarov'] = row['Количество товаров'] || row['Kolvo_Tovarov'] || null
+      standardizedRow['Kolvo_Tovarov'] =
+        row['Количество товаров'] ||
+        row['Kolvo_Tovarov'] ||
+        row['Фактическое количество'] ||
+        row['Fact'] ||
+        null
       
       // Паллет № - ОБЯЗАТЕЛЬНО устанавливаем значение
       standardizedRow['Pallet_No'] = row['Паллет №'] || row['Pallet_No'] || null
@@ -1583,7 +1620,7 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
   }
   
   // Проверяем наличие необходимых колонок в кратком отчете
-  const requiredColumns = ['Artikul', 'Kolvo_Tovarov', 'Pallet_No']
+  const requiredColumns = ['Artikul', 'Kolvo_Tovarov']
   const hasRequiredColumns = standardizedShortReport.length > 0 && 
     requiredColumns.every(col => standardizedShortReport[0].hasOwnProperty(col))
   
