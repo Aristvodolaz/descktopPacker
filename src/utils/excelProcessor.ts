@@ -1605,14 +1605,15 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
   standardizedShortReport.forEach((row, index) => {
     const artikul = row['Artikul']
     const kolvo = row['Kolvo_Tovarov']
-    const pallet = row['Pallet_No']
+    const pallet = String(row['Pallet_No'] || row['Паллет №'] || row['Паллет'] || '').trim()
     
     if (index < 3) { // Логируем первые 3 строки
       console.log(`Строка ${index}:`, { artikul, kolvo, pallet })
     }
     
-    if (artikul && kolvo && pallet) {
-      const groupKey = `${artikul}_${kolvo}_${pallet}`
+    if (artikul && kolvo) {
+      const palletKey = pallet || '__NO_PALLET__'
+      const groupKey = `${artikul}_${kolvo}_${palletKey}`
       
       if (!groupedData[groupKey]) {
         groupedData[groupKey] = { count: 0, pallet }
@@ -1653,7 +1654,8 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
   
   // Обрабатываем каждую группу
   Object.entries(groupedData).forEach(([groupKey, groupData]) => {
-    const [artikul, kolvo, pallet] = groupKey.split('_')
+    const [artikul, kolvo, palletKey] = groupKey.split('_')
+    const pallet = palletKey === '__NO_PALLET__' ? '' : palletKey
     const mesto = groupData.count
     
     console.log(`Обрабатываем группу: ${groupKey}, место: ${mesto}`)
@@ -1672,9 +1674,18 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
     }
     
     // Ищем совпадения в полном отчете по артикулу и вложенности (с приведением типов)
-    const matches = standardizedFullReport.filter(row => 
-      String(row['Artikul']) === String(artikul) && Number(row['Vlozhennost']) === Number(kolvo)
-    )
+    const matches = standardizedFullReport.filter(row => {
+      const sameArtikul = String(row['Artikul']) === String(artikul)
+      const sameVlozhennost = Number(row['Vlozhennost']) === Number(kolvo)
+      if (!sameArtikul || !sameVlozhennost) return false
+
+      // Если в кратком отчете есть паллет, матчим только по нему.
+      if (pallet) {
+        const rowPallet = String(row['Pallet_No'] || row['Паллет №'] || '').trim()
+        return rowPallet === pallet
+      }
+      return true
+    })
     
     console.log(`Найдено совпадений для ${artikul}/${kolvo}: ${matches.length}`)
     
@@ -1692,6 +1703,8 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
           
           standardizedFullReport[index] = {
             ...standardizedFullReport[index],
+            'Vlozhennost': Number(kolvo),
+            'Вложенность': Number(kolvo),
             'Mesto': mesto,
             'Место': mesto,
             'Pallet_No': pallet,
