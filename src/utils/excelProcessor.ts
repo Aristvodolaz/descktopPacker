@@ -354,12 +354,15 @@ const reorderColumns = (data: any[]): any[] => {
     const reorderedRow: any = {}
     const processedKeys = new Set<string>()
     
-    // Добавляем колонки в нужном порядке
+    // Добавляем колонки в нужном порядке.
+    // Если колонки нет в строке, оставляем ее пустой, чтобы структура отчета была фиксированной.
     for (const col of desiredColumnOrder) {
       if (row.hasOwnProperty(col)) {
         reorderedRow[col] = row[col]
-        processedKeys.add(col)
+      } else {
+        reorderedRow[col] = ''
       }
+      processedKeys.add(col)
     }
     
     // Добавляем оставшиеся колонки, которых нет в шаблоне и которые еще не обработаны
