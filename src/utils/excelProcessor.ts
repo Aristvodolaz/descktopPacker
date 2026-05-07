@@ -537,6 +537,21 @@ export const createExcelWithTimeInfo = (
   
   // Переименовываем колонки и обрабатываем данные
   const renameColumns = (dataset: any[]) => {
+    const keyAliases: Record<string, string> = {
+      // Паллет
+      'Pallet': 'Pallet_No',
+      'PalletNo': 'Pallet_No',
+      'pallet_no': 'Pallet_No',
+      'pallet': 'Pallet_No',
+      'Паллет': 'Pallet_No',
+      // Вложенность
+      'vlozhennost': 'Vlozhennost',
+      'Вложенность ': 'Vlozhennost',
+      // Место
+      'mesto': 'Mesto',
+      'Место ': 'Mesto'
+    }
+
     // Отладочная информация: выводим все колонки из первой строки
     if (dataset.length > 0) {
       console.log('=== DEBUG: Доступные колонки в данных ===')
@@ -555,7 +570,8 @@ export const createExcelWithTimeInfo = (
     return dataset.map(row => {
       const renamedRow: any = {}
       for (const [key, value] of Object.entries(row)) {
-        const russianName = downloadColumnMappings[key] || key
+        const normalizedKey = keyAliases[key] || key
+        const russianName = downloadColumnMappings[normalizedKey] || normalizedKey
         
         // Преобразуем ШК и ВП в строку для корректного отображения
         if (russianName === 'ШК' || russianName === 'ШК Сырья' || russianName === 'ШК WPS' || russianName === 'ВП') {
@@ -596,11 +612,15 @@ export const createExcelWithTimeInfo = (
   const lowerTaskName = taskName.toLowerCase()
   let isWB = lowerTaskName.includes('wb') || lowerTaskName.includes('wildberries')
   const isOzon = lowerTaskName.includes('ozon') || lowerTaskName.includes('озон')
-  const isOzonKorob = isOzon && (lowerTaskName.includes('korob') || lowerTaskName.includes('короб'))
+  // Точечный override: это задание нужно обрабатывать как WB
+  const isForcedWBTask = lowerTaskName.includes('2000050461226')
+  const isOzonKorob =
+    isOzon &&
+    (lowerTaskName.includes('korob') || lowerTaskName.includes('короб'))
   const isOzonPallet = isOzon && (lowerTaskName.includes('pallet') || lowerTaskName.includes('паллет'))
 
   // 1) Ozon короб должен работать как WB независимо от TipPostavki
-  if (isOzonKorob) {
+  if (isForcedWBTask || isOzonKorob) {
     console.log('=== OZON REPORT: режим Ozon КОРОБ → обрабатываем как WB ===')
     isWB = true
   }
@@ -662,7 +682,7 @@ export const createExcelWithTimeInfo = (
     dataSet2 = renameColumns(dataSet2)
     dataSet2 = filterData(dataSet2)
     dataSet2 = removeOzonColumnsForWB(dataSet2) // Удаляем колонки Озона для ВБ
-    dataSet2 = reorderColumns(dataSet2)
+    dataSet2 = reorderColumns(dataSet2, { strictTemplate: true })
   } else if (isWB && dataSet1.length > 0) {
     // Если нет полного отчета, используем старую логику агрегации
     const aggregatedData = aggregateWBDataFromShortReport(dataSet1)
@@ -672,7 +692,7 @@ export const createExcelWithTimeInfo = (
       processedAggregatedData = renameColumns(processedAggregatedData)
       processedAggregatedData = filterData(processedAggregatedData)
       processedAggregatedData = removeOzonColumnsForWB(processedAggregatedData) // Удаляем колонки Озона для ВБ
-      processedAggregatedData = reorderColumns(processedAggregatedData)
+      processedAggregatedData = reorderColumns(processedAggregatedData, { strictTemplate: true })
       
       // Добавляем агрегированные данные к полному отчету
       dataSet2 = [...dataSet2, ...processedAggregatedData]
@@ -682,7 +702,50 @@ export const createExcelWithTimeInfo = (
     dataSet2 = removeExcludedColumns(dataSet2)
     dataSet2 = renameColumns(dataSet2)
     dataSet2 = filterData(dataSet2)
-    dataSet2 = reorderColumns(dataSet2)
+
+    // Для Ozon pallet дозаполняем Место/Вложенность/Паллет № из краткого отчета,
+    // если в полном отчете они пустые.
+    if (isOzonPallet && dataSet1ForWBFullCalculation.length > 0) {
+      const shortByArtikul: Record<string, { mesto: any; vlozhennost: any; pallet: any }> = {}
+
+      dataSet1ForWBFullCalculation.forEach((row) => {
+        const artikul = String(row['Артикул'] || row['Artikul'] || '').trim()
+        if (!artikul) return
+
+        const mesto = row['Место'] ?? row['Mesto'] ?? null
+        const vlozhennost = row['Вложенность'] ?? row['Vlozhennost'] ?? null
+        const pallet = row['Паллет №'] ?? row['Pallet_No'] ?? row['Паллет'] ?? null
+
+        // Берем первую валидную комбинацию по артикулу
+        if (!shortByArtikul[artikul] && (mesto || vlozhennost || pallet)) {
+          shortByArtikul[artikul] = { mesto, vlozhennost, pallet }
+        }
+      })
+
+      dataSet2 = dataSet2.map((row) => {
+        const artikul = String(row['Артикул'] || row['Artikul'] || '').trim()
+        const source = shortByArtikul[artikul]
+        if (!source) return row
+
+        const hasMesto = row['Место'] !== undefined && row['Место'] !== null && row['Место'] !== ''
+        const hasVlozhennost =
+          row['Вложенность'] !== undefined && row['Вложенность'] !== null && row['Вложенность'] !== ''
+        const hasPallet = row['Паллет №'] !== undefined && row['Паллет №'] !== null && row['Паллет №'] !== ''
+
+        return {
+          ...row,
+          Mesto: hasMesto ? row['Место'] : (source.mesto ?? row['Mesto']),
+          'Место': hasMesto ? row['Место'] : (source.mesto ?? row['Место']),
+          Vlozhennost: hasVlozhennost ? row['Вложенность'] : (source.vlozhennost ?? row['Vlozhennost']),
+          'Вложенность': hasVlozhennost ? row['Вложенность'] : (source.vlozhennost ?? row['Вложенность']),
+          Pallet_No: hasPallet ? row['Паллет №'] : (source.pallet ?? row['Pallet_No']),
+          'Паллет №': hasPallet ? row['Паллет №'] : (source.pallet ?? row['Паллет №'])
+        }
+      })
+    }
+
+    // Для Ozon/прочих не применяем строгий WB-шаблон, чтобы не ломать структуру отчета
+    dataSet2 = reorderColumns(dataSet2, { strictTemplate: false })
   }
   
   // Извлекаем информацию о времени
@@ -870,8 +933,9 @@ export const createExcelWithTimeInfo = (
   if (isWB && sourceData.length > 0) {
     const wbReport = createWBReport(sourceData)
     if (wbReport.length > 0) {
-      const reorderedWbReport = reorderColumns(wbReport) // Применяем переупорядочивание колонок
-      const cleanedWbReport = removeFinalReportColumns(reorderedWbReport) // Удаляем ВП и Название задания
+      // Не вызываем reorderColumns(..., strictTemplate: true): колонки отчёта отклонений
+      // не входят в desiredColumnOrder и были бы отброшены (остались бы только поля шаблона).
+      const cleanedWbReport = removeFinalReportColumns(wbReport) // Удаляем ВП и Название задания
       const finalWbReport = removeOzonColumnsForWB(cleanedWbReport) // Удаляем колонки Озона для ВБ
       const wbWorksheet = XLSX.utils.json_to_sheet(finalWbReport)
       autosizeColumns(wbWorksheet, finalWbReport, Object.keys(finalWbReport[0] || {}))
@@ -883,7 +947,7 @@ export const createExcelWithTimeInfo = (
   else if (isOzon && !isWB && sourceData.length > 0) {
     const ozonReport = createOzonReport(sourceData)
     if (ozonReport.length > 0) {
-      const reorderedOzonReport = reorderColumns(ozonReport) // Применяем переупорядочивание колонок
+      const reorderedOzonReport = reorderColumns(ozonReport, { strictTemplate: false }) // Применяем переупорядочивание колонок
       const cleanedOzonReport = removeFinalReportColumns(reorderedOzonReport) // Удаляем ВП и Название задания
       const ozonWorksheet = XLSX.utils.json_to_sheet(cleanedOzonReport)
       autosizeColumns(ozonWorksheet, cleanedOzonReport, Object.keys(cleanedOzonReport[0] || {}))
@@ -895,7 +959,7 @@ export const createExcelWithTimeInfo = (
   else if (!isWB && !isOzon && sourceData.length > 0) {
     const generalReport = createWBReport(sourceData) // Используем ту же логику
     if (generalReport.length > 0) {
-      const reorderedGeneralReport = reorderColumns(generalReport) // Применяем переупорядочивание колонок
+      const reorderedGeneralReport = reorderColumns(generalReport, { strictTemplate: false }) // Применяем переупорядочивание колонок
       const cleanedGeneralReport = removeFinalReportColumns(reorderedGeneralReport) // Удаляем ВП и Название задания
       const generalWorksheet = XLSX.utils.json_to_sheet(cleanedGeneralReport)
       autosizeColumns(generalWorksheet, cleanedGeneralReport, Object.keys(cleanedGeneralReport[0] || {}))
@@ -1010,6 +1074,18 @@ interface QuantityDiscrepancy {
   discrepancy_percentage: number
 }
 
+// Первое непустое числовое значение из списка ключей (0 допустим; цепочка || давала бы ошибку для нуля)
+const firstNumericField = (row: any, keys: string[]): number => {
+  for (const key of keys) {
+    const v = row[key]
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      const n = Number(v)
+      if (!Number.isNaN(n)) return n
+    }
+  }
+  return 0
+}
+
 // Функция для расчета отклонений количества сборки
 const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
   if (!data || data.length === 0) return []
@@ -1019,11 +1095,12 @@ const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
   
   data.forEach(row => {
     const artikul = row.Artikul || row['Артикул']
-    if (artikul) {
-      if (!groupedByArtikul[artikul]) {
-        groupedByArtikul[artikul] = []
+    if (artikul !== undefined && artikul !== null && String(artikul).trim() !== '') {
+      const key = String(artikul).trim()
+      if (!groupedByArtikul[key]) {
+        groupedByArtikul[key] = []
       }
-      groupedByArtikul[artikul].push(row)
+      groupedByArtikul[key].push(row)
     }
   })
 
@@ -1041,11 +1118,11 @@ const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
     rows.forEach(row => {
       const mesto = Number(row.Mesto || row['Место'] || 0)
       const vlozhennost = Number(row.Vlozhennost || row['Вложенность'] || 0)
-      const itog = Number(row.Itog_Zakaz || row['Итог Заказ'] || 0)
+      const itog = firstNumericField(row, ['Itog_Zakaz', 'Итог Заказ'])
       
       totalCalculated += mesto * vlozhennost
       
-      // Берем максимальное значение Итог заказа (должно быть одинаковое для артикула)
+      // План только «Итог Заказ»; берём максимум по строкам артикула
       if (itog > itogZakaz) {
         itogZakaz = itog
       }
@@ -1553,6 +1630,11 @@ const extractUniqueShkWps = (data: any[]): string[] => {
 
 // Функция для расчета полного отчета ВБ (аналогично calculate_full_report из Python)
 const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): any[] => {
+  const normalizeArtikul = (value: any): string =>
+    String(value ?? '')
+      .trim()
+      .replace(/\.0+$/, '')
+
   console.log('=== calculateWBFullReport DEBUG ===')
   console.log('Краткий отчет (первые 2 строки):', shortReportData.slice(0, 2))
   console.log('Полный отчет (первые 2 строки):', fullReportData.slice(0, 2))
@@ -1573,10 +1655,12 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
       // Артикул - ОБЯЗАТЕЛЬНО устанавливаем значение
       standardizedRow['Artikul'] = row['Артикул'] || row['Artikul'] || null
       
-      // Количество товаров - ОБЯЗАТЕЛЬНО устанавливаем значение
+      // Количество товаров - ОБЯЗАТЕЛЬНО устанавливаем значение (WB короб часто заполняет «Кол-во сырья»)
       standardizedRow['Kolvo_Tovarov'] =
         row['Количество товаров'] ||
         row['Kolvo_Tovarov'] ||
+        row['Кол-во сырья'] ||
+        row['Kol_vo_Syrya'] ||
         row['Фактическое количество'] ||
         row['Fact'] ||
         null
@@ -1640,7 +1724,7 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
   const groupedData: { [key: string]: { count: number, pallet: string } } = {}
   
   standardizedShortReport.forEach((row, index) => {
-    const artikul = row['Artikul']
+    const artikul = normalizeArtikul(row['Artikul'])
     const kolvo = row['Kolvo_Tovarov']
     const pallet = String(row['Pallet_No'] || row['Паллет №'] || row['Паллет'] || '').trim()
     
@@ -1698,7 +1782,9 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
     console.log(`Обрабатываем группу: ${groupKey}, место: ${mesto}`)
     
     // Сначала ищем по артикулу (с приведением типов)
-    const artikulMatches = standardizedFullReport.filter(row => String(row['Artikul']) === String(artikul))
+    const artikulMatches = standardizedFullReport.filter(
+      row => normalizeArtikul(row['Artikul']) === normalizeArtikul(artikul)
+    )
     console.log(`Найдено строк с артикулом ${artikul}: ${artikulMatches.length}`)
     
     if (artikulMatches.length > 0) {
@@ -1712,7 +1798,7 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
     
     // Ищем совпадения в полном отчете по артикулу и вложенности (с приведением типов)
     const matches = standardizedFullReport.filter(row => {
-      const sameArtikul = String(row['Artikul']) === String(artikul)
+      const sameArtikul = normalizeArtikul(row['Artikul']) === normalizeArtikul(artikul)
       const sameVlozhennost = Number(row['Vlozhennost']) === Number(kolvo)
       if (!sameArtikul || !sameVlozhennost) return false
 
@@ -1751,7 +1837,9 @@ const calculateWBFullReport = (shortReportData: any[], fullReportData: any[]): a
       })
     } else {
       // Добавляем новые строки для несовпадающих элементов
-      const matchesForCopy = standardizedFullReport.filter(row => String(row['Artikul']) === String(artikul))
+      const matchesForCopy = standardizedFullReport.filter(
+        row => normalizeArtikul(row['Artikul']) === normalizeArtikul(artikul)
+      )
       
       console.log(`Создаем новые строки для ${artikul}, найдено для копирования: ${matchesForCopy.length}`)
       
