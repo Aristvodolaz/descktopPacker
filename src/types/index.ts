@@ -93,6 +93,8 @@ export interface UploadData {
   Zamorozhennaya_Zona?: string
   vp?: string
   Plan_Otkaz?: number
+  SHK_Original?: string
+  SHK_Changed?: string
 }
 
 export interface ExpiryData {
@@ -211,4 +213,6 @@ export interface TaskRecord {
   Plans: number
   Fact: number
   Razlichie: number
+  SHK_Original?: string
+  SHK_Changed?: string
 } 

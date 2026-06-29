@@ -69,7 +69,9 @@ export const uploadColumnMappings: Record<string, string> = {
   'Time_Start': 'Начало',
   'Time_End': 'Окончание',
   'time_start': 'Начало',
-  'time_end': 'Окончание'
+  'time_end': 'Окончание',
+  'SHK_Original': 'Исходный ШК',
+  'SHK_Changed': 'Измененный ШК'
 }
 
 // Маппинг колонок для скачивания (английские названия -> русские)
@@ -154,7 +156,9 @@ export const downloadColumnMappings: Record<string, string> = {
   'Time_Start': 'Начало',
   'Time_End': 'Окончание',
   'time_start': 'Начало',
-  'time_end': 'Окончание'
+  'time_end': 'Окончание',
+  'SHK_Original': 'Исходный ШК',
+  'SHK_Changed': 'Измененный ШК'
 }
 
 // Обратный маппинг для загрузки (русские названия -> английские)

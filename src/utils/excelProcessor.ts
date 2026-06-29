@@ -1049,6 +1049,21 @@ export const createExcelWithTimeInfo = (
     setCellFormatting(worksheet2, cleanedDataSet2, Object.keys(cleanedDataSet2[0] || {}))
     XLSX.utils.book_append_sheet(workbook, worksheet2, 'Полный отчет')
   }
+
+  // Создаем лист с историей изменений ШК
+  const barcodeHistory = createBarcodeHistorySheet(mainDataSet)
+  if (barcodeHistory.length > 0) {
+    const historyWorksheet = XLSX.utils.json_to_sheet(barcodeHistory)
+    
+    // Авторазмер колонок для истории ШК
+    const historyHeader = Object.keys(barcodeHistory[0])
+    historyWorksheet['!cols'] = historyHeader.map(() => ({ wch: 20 }))
+    
+    // Применяем форматирование
+    setCellFormatting(historyWorksheet, barcodeHistory, historyHeader)
+    
+    XLSX.utils.book_append_sheet(workbook, historyWorksheet, 'История ШК')
+  }
   
   // Если есть только один набор данных, называем его "Отчет"
   if (dataSet1.length > 0 && dataSet2.length === 0) {
@@ -1062,6 +1077,35 @@ export const createExcelWithTimeInfo = (
   }
   
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+}
+
+// Функция для создания листа с историей изменений штрих-кодов
+const createBarcodeHistorySheet = (data: any[]): any[] => {
+  if (!data || data.length === 0) return []
+
+  const history: any[] = []
+  const processedKeys = new Set<string>()
+
+  data.forEach(row => {
+    const artikul = row['Artikul'] || row['Артикул'] || ''
+    const shkOriginal = row['SHK_Original'] || row['Исходный ШК'] || ''
+    const shkChanged = row['SHK_Changed'] || row['Измененный ШК'] || ''
+
+    // Добавляем только если есть изменения и мы еще не обрабатывали эту пару
+    if (shkChanged && shkOriginal && shkChanged !== shkOriginal) {
+      const key = `${artikul}|${shkOriginal}|${shkChanged}`
+      if (!processedKeys.has(key)) {
+        history.push({
+          'Артикул': artikul,
+          'Исходный ШК': shkOriginal,
+          'Измененный ШК': shkChanged
+        })
+        processedKeys.add(key)
+      }
+    }
+  })
+
+  return history
 }
 
 // Интерфейс для отклонений количества

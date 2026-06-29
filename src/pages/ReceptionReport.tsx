@@ -105,7 +105,9 @@ const ReceptionReport: React.FC = () => {
         'Артикул': record.Artikul,
         'По плану': record.Plans,
         'Факт': record.Fact,
-        'Различие': record.Razlichie
+        'Различие': record.Razlichie,
+        'SHK_Original': record.SHK_Original,
+        'SHK_Changed': record.SHK_Changed
       }))
 
       // Отладочная информация
@@ -333,6 +335,12 @@ const ReceptionReport: React.FC = () => {
                             </th>
                             <th className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                               <div className="flex items-center">
+                                ШК
+                                <ArrowUpIcon className="ml-1 h-4 w-4 text-gray-400" />
+                              </div>
+                            </th>
+                            <th className="group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                              <div className="flex items-center">
                                 По плану
                                 <ArrowUpIcon className="ml-1 h-4 w-4 text-gray-400" />
                               </div>
@@ -359,6 +367,16 @@ const ReceptionReport: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {record.Artikul}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div className="flex flex-col">
+                                  <span>{record.SHK_Changed || record.SHK_Original || '-'}</span>
+                                  {record.SHK_Changed && record.SHK_Original && record.SHK_Changed !== record.SHK_Original && (
+                                    <span className="text-xs text-amber-600 font-medium">
+                                      (изм. с {record.SHK_Original})
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {record.Plans}
