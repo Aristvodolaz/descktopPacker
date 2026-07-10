@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { TaskName, TaskRecord } from '../types'
-import { getUniqueTaskNames, getTaskRecords } from '../utils/api'
+import { getUniqueTaskNames, getTaskRecords, downloadTaskData } from '../utils/api'
 import { createExcelWithTimeInfo } from '../utils/excelProcessor'
-import { MagnifyingGlassIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline'
+import { MagnifyingGlassIcon, ArrowUpIcon, ArrowDownIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
 import Pagination from '../components/Pagination'
 import ItemsPerPageSelector from '../components/ItemsPerPageSelector'
+import toast from 'react-hot-toast'
 
 const ReceptionReport: React.FC = () => {
   // Состояния для списка заданий
   const [taskNames, setTaskNames] = useState<TaskName[]>([])
   const [selectedTask, setSelectedTask] = useState<string | null>(null)
   const [taskRecords, setTaskRecords] = useState<TaskRecord[]>([])
+  const [showOnlyChanged, setShowOnlyChanged] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,6 +44,18 @@ const ReceptionReport: React.FC = () => {
     
     return result
   }, [taskNames, searchQuery, sortOrder])
+
+  // Фильтрация записей задания (по измененным ШК)
+  const filteredRecords = useMemo(() => {
+    if (!showOnlyChanged) return taskRecords
+    
+    return taskRecords.filter(record => {
+      const currentShk = record.SHK || record.Barcode || ''
+      // Добавляем больше вариантов для поиска оригинального ШК в UI
+      const originalShk = record.SHK_Original || record.shk_original || record.SHK_SPO || record.shk_spo || record.SHK_Syrya || record.shk_syrya || ''
+      return originalShk && originalShk !== currentShk
+    })
+  }, [taskRecords, showOnlyChanged])
 
   // Пагинация
   const totalPages = Math.ceil(filteredAndSortedTasks.length / itemsPerPage)
@@ -80,8 +94,49 @@ const ReceptionReport: React.FC = () => {
       setError(null)
       setSelectedTask(taskName)
       
+      // Получаем краткие записи для таблицы
       const records = await getTaskRecords(taskName)
-      setTaskRecords(records)
+      
+      // Пытаемся получить полные данные для извлечения истории ШК
+      try {
+        const fullData = await downloadTaskData(taskName)
+        const allFullRecords = [...(fullData.dataSet1 || []), ...(fullData.dataSet2 || [])]
+        
+        // Создаем карту истории ШК по артикулу
+        const historyMap = new Map<string, any>()
+        allFullRecords.forEach(r => {
+          const art = String(r.Artikul || r['Артикул'] || '').trim()
+          const orig = r.SHK_Original || r.shk_original || r.SHK_SPO || r.shk_spo || ''
+          if (art && orig) {
+            historyMap.set(art, r)
+          }
+        })
+
+        // Обогащаем краткие записи данными об истории
+        const enrichedRecords = records.map(record => {
+          const art = String(record.Artikul || '').trim()
+          const fullRecord = historyMap.get(art)
+          if (fullRecord) {
+            return {
+              ...record,
+              SHK_Original: fullRecord.SHK_Original || fullRecord.shk_original || fullRecord.SHK_SPO || fullRecord.shk_spo,
+              SHK_Changed: fullRecord.SHK_Changed || fullRecord.shk_changed || fullRecord.SHK || fullRecord.Barcode,
+              shk_original: fullRecord.shk_original,
+              shk_changed: fullRecord.shk_changed
+            }
+          }
+          return record
+        })
+        
+        setTaskRecords(enrichedRecords)
+      } catch (fullDataErr) {
+        console.warn('Could not fetch full data for enrichment:', fullDataErr)
+        setTaskRecords(records)
+      }
+      
+      console.log('=== API RESPONSE DEBUG ===')
+      console.log('Task:', taskName)
+      console.log('Records count:', records.length)
     } catch (err) {
       console.error('Error loading task records:', err)
       setError('Ошибка загрузки записей задания')
@@ -91,35 +146,27 @@ const ReceptionReport: React.FC = () => {
     }
   }
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (taskRecords.length === 0) {
       alert('Нет данных для экспорта')
       return
     }
 
     try {
-      // Преобразуем данные в нужный формат для Excel с русскими названиями колонок
-      const formattedData = taskRecords.map(record => ({
-        'ВП': record.VP,
-        'Название задания': selectedTask,
-        'Артикул': record.Artikul,
-        'По плану': record.Plans,
-        'Факт': record.Fact,
-        'Различие': record.Razlichie,
-        'SHK_Original': record.SHK_Original,
-        'SHK_Changed': record.SHK_Changed
-      }))
-
-      // Отладочная информация
-      console.log('Formatted Data:', formattedData)
-
-      // Создаем структуру данных для Excel
+      toast.loading('Подготовка полных данных для экспорта...')
+      
+      // Для экспорта ВСЕГДА скачиваем полные данные, чтобы не потерять историю ШК
+      const fullData = await downloadTaskData(selectedTask!)
+      
+      // Подготавливаем данные для процессора
       const excelData = {
-        dataSet1: formattedData,
-        dataSet2: formattedData // Добавляем также в dataSet2 для полного отчета
+        dataSet1: fullData.dataSet1 || [],
+        dataSet2: fullData.dataSet2 || []
       }
 
-      console.log('Excel Data Structure:', excelData)
+      console.log('=== EXPORT DEBUG (FULL DATA) ===')
+      console.log('DataSet1 length:', excelData.dataSet1.length)
+      console.log('DataSet2 length:', excelData.dataSet2.length)
 
       // Создаем Excel файл
       const excelBuffer = createExcelWithTimeInfo(excelData, selectedTask || 'Отчет о приемке')
@@ -136,8 +183,11 @@ const ReceptionReport: React.FC = () => {
       link.click()
       
       window.URL.revokeObjectURL(url)
+      toast.dismiss()
+      toast.success('Отчет успешно сформирован')
     } catch (err) {
       console.error('Error exporting to Excel:', err)
+      toast.dismiss()
       alert('Ошибка при экспорте в Excel')
     }
   }
@@ -264,15 +314,29 @@ const ReceptionReport: React.FC = () => {
                   <h2 className="text-lg font-medium text-gray-900">
                     Детали задания: {selectedTask}
                   </h2>
-                  <div className="flex gap-2">
-                    {taskRecords.length > 0 && (
-                      <button
-                        onClick={handleExportToExcel}
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        📊 Экспорт в Excel
-                      </button>
-                    )}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex items-center">
+                      <input
+                        id="only-changed-shk"
+                        type="checkbox"
+                        checked={showOnlyChanged}
+                        onChange={(e) => setShowOnlyChanged(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="only-changed-shk" className="ml-2 block text-sm text-gray-900">
+                        Только с измененными ШК
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      {taskRecords.length > 0 && (
+                        <button
+                          onClick={handleExportToExcel}
+                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          📊 Экспорт в Excel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -360,43 +424,59 @@ const ReceptionReport: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {taskRecords.map((record, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {record.VP}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {record.Artikul}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <div className="flex flex-col">
-                                  <span>{record.SHK_Changed || record.SHK_Original || '-'}</span>
-                                  {record.SHK_Changed && record.SHK_Original && record.SHK_Changed !== record.SHK_Original && (
-                                    <span className="text-xs text-amber-600 font-medium">
-                                      (изм. с {record.SHK_Original})
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {record.Plans}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {record.Fact}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  record.Razlichie === 0 
-                                    ? 'bg-green-100 text-green-800'
-                                    : record.Razlichie > 0
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {record.Razlichie > 0 ? '+' : ''}{record.Razlichie}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {filteredRecords.map((record, index) => {
+                            const currentShk = record.SHK || record.Barcode || '-'
+                            // Добавляем больше вариантов для поиска оригинального ШК в таблице
+                            const originalShk = record.SHK_Original || record.shk_original || record.SHK_SPO || record.shk_spo || record.SHK_Syrya || record.shk_syrya || ''
+                            const isShkChanged = originalShk && originalShk !== (record.SHK || record.Barcode || '')
+
+                            return (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {record.VP}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {record.Artikul}
+                                </td>
+                                <td className={`px-6 py-4 whitespace-nowrap text-sm ${isShkChanged ? 'bg-amber-50' : 'text-gray-900'}`}>
+                                  <div className="flex flex-col group relative">
+                                    <div className="flex items-center">
+                                      <span className={isShkChanged ? 'font-medium text-amber-900' : ''}>
+                                        {currentShk}
+                                      </span>
+                                      {isShkChanged && (
+                                        <InformationCircleIcon className="ml-1 h-4 w-4 text-amber-500 cursor-help" />
+                                      )}
+                                    </div>
+                                    {isShkChanged && (
+                                      <div className="invisible group-hover:visible absolute z-10 w-64 p-2 mt-1 text-xs text-white bg-gray-800 rounded shadow-lg -bottom-14 left-0">
+                                        <p className="font-semibold mb-1 text-amber-300">Штрих-код изменен:</p>
+                                        <p>Изначальный: {originalShk}</p>
+                                        <p>Текущий: {currentShk}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {record.Plans}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {record.Fact}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    record.Razlichie === 0 
+                                      ? 'bg-green-100 text-green-800'
+                                      : record.Razlichie > 0
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {record.Razlichie > 0 ? '+' : ''}{record.Razlichie}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>

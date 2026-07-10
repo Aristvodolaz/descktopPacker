@@ -505,6 +505,77 @@ function setCellFormatting(worksheet: XLSX.WorkSheet, _data: any[], _header: str
   }
 }
 
+// Функция для создания листа с историей изменений штрих-кодов
+const createBarcodeHistorySheet = (data: any[]): any[] => {
+  if (!data || data.length === 0) return []
+
+  console.log('=== createBarcodeHistorySheet: Start checking history ===')
+  console.log('Total rows to check:', data.length)
+  
+  // Отладочный лог: проверим ключи первой и, если есть, 50-й строки (часто там полные данные)
+  console.log('Row 0 keys:', Object.keys(data[0]))
+  if (data.length > 45) {
+    console.log('Row 45 keys:', Object.keys(data[45]))
+  }
+
+  const history: any[] = []
+  const processedKeys = new Set<string>()
+
+  const artikulKeys = ['Artikul', 'Артикул', 'artikul', 'articul', 'id_artikul']
+  const currentShkKeys = ['Barcode', 'SHK', 'barcode', 'shk', 'ШК']
+  const originalShkKeys = ['SHK_Original', 'shk_original', 'Original_SHK', 'Исходный ШК', 'SHK_SPO', 'SHK_SPO_1', 'SHK_Syrya', 'ШК Сырья', 'original_shk', 'shk_spo']
+  const changedShkKeys = ['SHK_Changed', 'shk_changed', 'Changed_SHK', 'Измененный ШК', 'changed_shk']
+
+  data.forEach((row, index) => {
+    const artikul = getFlexibleVal(row, artikulKeys)
+    const currentShk = getFlexibleVal(row, currentShkKeys)
+    const rawOriginal = getFlexibleVal(row, originalShkKeys)
+    const rawChanged = getFlexibleVal(row, changedShkKeys)
+    
+    // Логика определения изменений: есть оригинальный ШК и он не равен текущему
+    const isChanged = rawOriginal !== '' && rawOriginal !== currentShk
+
+    // Логируем только если нашли хоть что-то похожее на историю
+    if (rawOriginal !== '' || rawChanged !== '') {
+      if (index < 5 || isChanged || index % 20 === 0) {
+        console.log(`Row ${index}: Art="${artikul}", Orig="${rawOriginal}", Curr="${currentShk}", Changed="${rawChanged}", isChanged=${isChanged}`)
+      }
+    }
+
+    if (isChanged) {
+      const key = `${artikul}|${rawOriginal}|${currentShk}`
+      if (!processedKeys.has(key)) {
+        console.log(`! Found change at row ${index}: ${artikul} | ${rawOriginal} -> ${currentShk}`)
+        history.push({
+          'Артикул': artikul,
+          'Исходный ШК': rawOriginal,
+          'Измененный ШК': rawChanged || currentShk
+        })
+        processedKeys.add(key)
+      }
+    }
+  })
+
+  console.log('History entries found:', history.length)
+  console.log('=== createBarcodeHistorySheet: End ===')
+  return history
+}
+
+// Гибкий поиск значений по списку возможных ключей
+const getFlexibleVal = (row: any, possibleKeys: string[]) => {
+  for (const key of possibleKeys) {
+    const val = row[key]
+    if (val !== undefined && val !== null) {
+      const sVal = String(val).trim()
+      if (sVal !== '' && sVal.toUpperCase() !== 'NULL' && sVal !== 'undefined' && sVal !== '0') {
+        return sVal
+      }
+    }
+  }
+  return ''
+}
+
+
 // Основная функция для создания Excel файла с данными о времени
 export const createExcelWithTimeInfo = (
   data: any, 
@@ -531,6 +602,15 @@ export const createExcelWithTimeInfo = (
   
   // Определяем основной набор данных для извлечения времени
   const mainDataSet = dataSet2.length > 0 ? dataSet2 : dataSet1
+  
+  // Собираем все исходные данные для истории ШК (до фильтрации и переименования)
+  // Используем глубокую копию, чтобы избежать влияния последующих модификаций
+  const allRawDataForHistory = JSON.parse(JSON.stringify([...dataSet1, ...dataSet2]))
+  
+  if (dataSet2.length > 0) {
+    console.log('=== DEBUG: dataSet2 keys (first row) ===')
+    console.log(Object.keys(dataSet2[0]))
+  }
   
   // Сохраняем копию исходных данных для извлечения ШК WPS (до переименования колонок)
   const originalMainDataSet = JSON.parse(JSON.stringify(mainDataSet))
@@ -1051,7 +1131,13 @@ export const createExcelWithTimeInfo = (
   }
 
   // Создаем лист с историей изменений ШК
-  const barcodeHistory = createBarcodeHistorySheet(mainDataSet)
+  console.log('--- Calling createBarcodeHistorySheet ---')
+  console.log('Data length:', allRawDataForHistory.length)
+  if (allRawDataForHistory.length > 0) {
+    console.log('First row keys:', Object.keys(allRawDataForHistory[0]))
+  }
+  const barcodeHistory = createBarcodeHistorySheet(allRawDataForHistory)
+  console.log('Barcode history entries found:', barcodeHistory.length)
   if (barcodeHistory.length > 0) {
     const historyWorksheet = XLSX.utils.json_to_sheet(barcodeHistory)
     
@@ -1077,35 +1163,6 @@ export const createExcelWithTimeInfo = (
   }
   
   return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-}
-
-// Функция для создания листа с историей изменений штрих-кодов
-const createBarcodeHistorySheet = (data: any[]): any[] => {
-  if (!data || data.length === 0) return []
-
-  const history: any[] = []
-  const processedKeys = new Set<string>()
-
-  data.forEach(row => {
-    const artikul = row['Artikul'] || row['Артикул'] || ''
-    const shkOriginal = row['SHK_Original'] || row['Исходный ШК'] || ''
-    const shkChanged = row['SHK_Changed'] || row['Измененный ШК'] || ''
-
-    // Добавляем только если есть изменения и мы еще не обрабатывали эту пару
-    if (shkChanged && shkOriginal && shkChanged !== shkOriginal) {
-      const key = `${artikul}|${shkOriginal}|${shkChanged}`
-      if (!processedKeys.has(key)) {
-        history.push({
-          'Артикул': artikul,
-          'Исходный ШК': shkOriginal,
-          'Измененный ШК': shkChanged
-        })
-        processedKeys.add(key)
-      }
-    }
-  })
-
-  return history
 }
 
 // Интерфейс для отклонений количества
@@ -1227,15 +1284,6 @@ const createOzonReport = (data: any[]): any[] => {
   }))
 }
 
-// Интерфейс для сводки по паллетам
-interface PalletSummary {
-  pallet_number: string
-  places_count: number
-  articles_count: number
-  renamed_number?: number
-}
-
-// Функция для создания сводки по паллетам
 // Интерфейс для сводки по паллетам
 interface PalletSummary {
   pallet_number: string
@@ -1554,7 +1602,7 @@ const aggregateShortReport = (data: any[]): any[] => {
     const artikul = row['Артикул'] || row['Artikul']
     const shkWps  = row['ШК WPS'] || row['SHK_WPS']
     const palletNo = row['Паллет №'] || row['Pallet_No']
-    const vlozhennost = row['Вложенность'] || row['Vlozhennost']
+    const vlozhennost = row['Вложенность'] !== undefined ? row['Вложенность'] : row['Vlozhennost']
     const quantity = row['Количество товаров'] || row['Kolvo_Tovarov']
     console.log(`${index}: Артикул=${artikul}, ШК WPS=${shkWps}, Паллет=${palletNo}, Вложенность=${vlozhennost}, Кол-во=${quantity}`)
   })

@@ -95,6 +95,12 @@ export interface UploadData {
   Plan_Otkaz?: number
   SHK_Original?: string
   SHK_Changed?: string
+  SHK_SPO?: string
+  SHK_Syrya?: string
+  shk_original?: string
+  shk_changed?: string
+  shk_spo?: string
+  shk_syrya?: string
 }
 
 export interface ExpiryData {
@@ -213,6 +219,14 @@ export interface TaskRecord {
   Plans: number
   Fact: number
   Razlichie: number
+  SHK?: string
+  Barcode?: string
   SHK_Original?: string
   SHK_Changed?: string
-} 
+  SHK_SPO?: string
+  SHK_Syrya?: string
+  shk_original?: string
+  shk_changed?: string
+  shk_spo?: string
+  shk_syrya?: string
+}
