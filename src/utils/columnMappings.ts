@@ -13,7 +13,7 @@ export const uploadColumnMappings: Record<string, string> = {
   'Pechat_Etiketki_s_Opisaniem': 'Печать этикетки с описанием',
   'PriznakSortirovki': 'Сортировка товара по признаку',
   /** Каноническое поле БД; в WB для той же сущности колонка «Фасовка/сборка товара в короб» — см. reverse */
-  'Upakovka_v_Gofro': 'Упаковка в гофро',
+  'Upakovka_v_Gofro': 'Фасовка/сборка товара в короб',
   'Upakovka_v_PE_Paket': 'Упаковка товара в п/э пакет',
   'Spetsifikatsiya_TM': 'Спецификация ТМ',
   'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
@@ -98,7 +98,7 @@ export const downloadColumnMappings: Record<string, string> = {
   'Op_16_TU_3_5': 'Упаковка в пакет с клеевым слоем',
   'Op_17_TU_6_8': 'Упаковка в пакет с замком Zip Lock',
   'Op_468_Proverka_SHK': 'Упаковка в бабл - пленку',
-  'Upakovka_v_Gofro': 'Тип операции',
+  'Upakovka_v_Gofro': 'Фасовка/сборка товара в короб',
   'PriznakSortirovki': 'Сортируемый товар',
   'Vlozhit_v_upakovku_pechatnyi_material': 'Вложить в упаковку печатный материал',
   'Izmerenie_VGH_i_peredacha_informatsii': 'Измерение ВГХ и передача информации',
