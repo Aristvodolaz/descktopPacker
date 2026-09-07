@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { getWarehouses, uploadRowData, checkTaskExists, updateShkCoroba } from '../utils/api'
 import { UploadData, UploadProgress } from '../types'
-import { processOpColumnValue, reverseUploadColumnMappings, omitEmptyUploadFields } from '../utils/columnMappings'
+import { processOpColumnValue, resolveUploadField, omitEmptyUploadFields } from '../utils/columnMappings'
 import { processUploadedExcel, processShkCorobaExcel, ShkCorobaData } from '../utils/excelProcessor'
 
 // Тип для вкладок
@@ -57,7 +57,8 @@ const LDU_FLAG_FIELDS = [
   'Markirovka_Palleta_TM',
   'Raskomplekt_Zakaza',
   'Zamorozhennaya_Zona',
-  'Spetsifikatsiya_TM'
+  'Spetsifikatsiya_TM',
+  'Termoupakovka'
 ]
 
 export default function Upload() {
@@ -186,6 +187,7 @@ export default function Upload() {
           Upakovochnyi_Material: null,
           Markirovka_Palleta_TM: null,
           Raskomplekt_Zakaza: null,
+          Termoupakovka: null,
           Zamorozhennaya_Zona: null,
           vp: null,
           Plan_Otkaz: null
@@ -195,7 +197,7 @@ export default function Upload() {
         for (const [key, value] of Object.entries(row)) {
           const colKey = typeof key === 'string' ? key.trim() : key
           // Получаем английское название колонки
-          const englishKey = reverseUploadColumnMappings[colKey] || colKey
+          const englishKey = resolveUploadField(String(colKey)) || colKey
           
           // Пропускаем исключенные колонки
           if (EXCLUDED_COLUMNS.includes(englishKey)) {

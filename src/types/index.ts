@@ -90,6 +90,8 @@ export interface UploadData {
   Upakovochnyi_Material?: string
   Markirovka_Palleta_TM?: string
   Raskomplekt_Zakaza?: string
+  /** Колонка «Термоупаковка» шаблона «Заявка НПП» */
+  Termoupakovka?: string
   Zamorozhennaya_Zona?: string
   vp?: string
   Plan_Otkaz?: number

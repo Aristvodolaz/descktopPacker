@@ -1,7 +1,14 @@
+import { TEMPLATE_COLUMNS, HEADER_ALIASES, headerToField, normalizeFlagValue } from './nppTemplate'
+
+// Заголовки колонок шаблона «Заявка НПП» — единый источник правды (см. ./nppTemplate).
+const templateHeaders: Record<string, string> = Object.fromEntries(
+  TEMPLATE_COLUMNS.map(col => [col.field, col.header])
+)
+
 // Маппинг колонок для загрузки (английские названия -> русские подписи Excel)
-// Совпадает с utils/lduUploadMapping.js на service-komus (applyLduExcelHeaders)
-export const uploadColumnMappings: Record<string, string> = {
-  // Поля нового шаблона ЛДУ
+// Совпадает с utils/lduTemplate.js на service-komus (applyLduExcelHeaders)
+const uploadColumnMappingsBase: Record<string, string> = {
+  // Поля шаблона «Заявка НПП»
   'Sortiruemyi_Tovar': 'Сортируемый товар',
   'Ne_Sortiruemyi_Tovar': 'Не сортируемый товар',
   'Produkty': 'Продукты',
@@ -74,8 +81,14 @@ export const uploadColumnMappings: Record<string, string> = {
   'SHK_Changed': 'Измененный ШК'
 }
 
+// Заголовки колонок шаблона всегда берём из nppTemplate, остальные — из списка выше.
+export const uploadColumnMappings: Record<string, string> = {
+  ...uploadColumnMappingsBase,
+  ...templateHeaders
+}
+
 // Маппинг колонок для скачивания (английские названия -> русские)
-export const downloadColumnMappings: Record<string, string> = {
+const downloadColumnMappingsBase: Record<string, string> = {
   'Op_1_Bl_1_Sht': 'Упаковка товара в индивидуальный короб',
   'Op_2_Bl_2_Sht': 'Пересчет товара',
   'Op_3_Bl_3_Sht': 'Фасовка/сборка монотовара в короб',
@@ -161,18 +174,28 @@ export const downloadColumnMappings: Record<string, string> = {
   'SHK_Changed': 'Измененный ШК'
 }
 
+export const downloadColumnMappings: Record<string, string> = {
+  ...downloadColumnMappingsBase,
+  ...templateHeaders
+}
+
 // Обратный маппинг для загрузки (русские названия -> английские)
 export const reverseUploadColumnMappings: Record<string, string> = Object.fromEntries(
   Object.entries(uploadColumnMappings).map(([key, value]) => [value, key])
 )
 
+// Заголовки шаблона «Заявка НПП» и алиасы прошлых шапок (см. HEADER_ALIASES в ./nppTemplate).
+for (const [header, field] of Object.entries(HEADER_ALIASES)) {
+  reverseUploadColumnMappings[header] = field
+}
+for (const col of TEMPLATE_COLUMNS) {
+  reverseUploadColumnMappings[col.header] = col.field
+}
+
 // Варианты заголовков из старых шаблонов Excel (не перезаписывают канонические ключи выше)
-reverseUploadColumnMappings['Упаковка товара в п/э пакет'] = 'Upakovka_v_PE_Paket'
 reverseUploadColumnMappings['Упаковка в ПЭ пакет'] = 'Upakovka_v_PE_Paket'
 reverseUploadColumnMappings['Упаковка в п/э пакет'] = 'Upakovka_v_PE_Paket'
-reverseUploadColumnMappings['Тип операции'] = 'Tip_Operatsii_LDU'
 reverseUploadColumnMappings['Упаковка в бабл-плёнку'] = 'Upakovka_v_Babl_Plenku'
-reverseUploadColumnMappings['Упаковка в бабл - пленку'] = 'Upakovka_v_Babl_Plenku'
 reverseUploadColumnMappings['Упаковка в инд. короб'] = 'Upakovka_v_Ind_Korob'
 reverseUploadColumnMappings['Сборка наборов от 2 штук разных товаров'] =
   'Sborka_naborov_ot_2_shtuk_raznykh_tovarov'
@@ -182,26 +205,23 @@ reverseUploadColumnMappings['Удаление стикера/маркировк�
 reverseUploadColumnMappings['Раскомплект заказа'] = 'Raskomplekt_Zakaza'
 reverseUploadColumnMappings['Маркировка паллета (ТМ)'] = 'Markirovka_Palleta_TM'
 // Тип поставки / моно (русские и латинские заголовки)
-reverseUploadColumnMappings['Тип поставки'] = 'Tip_Postavki'
 reverseUploadColumnMappings['тип поставки'] = 'Tip_Postavki'
 reverseUploadColumnMappings['МОНО'] = 'Mono'
 reverseUploadColumnMappings['Моно'] = 'Mono'
 
-// Шаблон WB (в т.ч. «Южный кластер»): подписи столбцов отличаются от канонических в uploadColumnMappings
-reverseUploadColumnMappings['Спецификация транспортного паллета (для маркеплейсов)'] =
-  'Spetsifikatsiya_TM'
-reverseUploadColumnMappings['Формирование транспортного паллета для отгрузки'] =
-  'Formirovanie_Pallet_Otgruzki'
-reverseUploadColumnMappings['Вложить печатный материал'] = 'Vlozhit_v_upakovku_pechatnyi_material'
+// Шаблон WB (в т.ч. «Южный кластер»): подписи столбцов отличаются от канонических
 reverseUploadColumnMappings['Приемка в транспортных коробах'] =
   'Priemka_tovara_v_transportnykh_korobakh'
 reverseUploadColumnMappings['Паллетная приемка'] = 'Priemka_tovara_palletnaya'
 reverseUploadColumnMappings['Прочие работы (в т.ч. устранение аномалий)'] =
   'Prochie_raboty_vklyuchaya_ustranenie_anomalii'
 
-// Колонки Test_MP без отдельного поля клиента — только реальные имена БД
-reverseUploadColumnMappings['Фасовка/сборка товара в короб'] = 'Upakovka_v_Gofro'
-reverseUploadColumnMappings['Проверка ШК'] = 'Primeryka_SHK'
+/**
+ * Поле Test_MP по заголовку колонки Excel. Сначала точное совпадение, затем
+ * нормализованный поиск по шаблону (регистр, «ё», двойные и хвостовые пробелы).
+ */
+export const resolveUploadField = (header: string): string | null =>
+  reverseUploadColumnMappings[header] ?? headerToField(header)
 
 /** Убирает null/undefined из объекта перед POST — чтобы сработали дефолты сервера (upload-data-new). */
 export function omitEmptyUploadFields(
@@ -227,71 +247,13 @@ export function omitEmptyUploadFields(
 }
 
 // Порядок колонок для отчета (соответствует изображению)
-export const desiredColumnOrder = [
-  // Полный отчет: порядок колонок соответствует эталонному файлу Книга1.xlsx
-  "ВП",
-  "Артикул",
-  "Артикул Сырья",
-  "Название товара",
-  "ШК",
-  "ШК Сырья",
-  "Номенклатура",
-  "Кол-во сырья",
-  "Итог Заказ",
-  "СОХ",
-  "Срок Годности",
-  "Проверка ШК",
-  "Проверка срока годности",
-  "Упаковка товара в п/э пакет",
-  "Упаковка в бабл - пленку",
-  "Упаковка товара в индивидуальный короб",
-  "Маркировка товара (стикером, ЧЗ, противокражной этикеткой)",
-  "Фасовка/сборка товара в короб",
-  "Удаление стикера/маркировки с товара",
-  "Дополнительная защита товара",
-  "Маркировка транспортного короба",
-  "Спецификация транспортного паллета (для маркеплейсов)",
-  "Формирование наборов (комплектов) от 2-х ед. товара",
-  "Формирование транспортного паллета для отгрузки",
-  "Вложить печатный материал",
-  "Сортировка товара по признаку",
-  "Маркировка паллета (транспортного модуля)",
-  "Раскомплект заказа (полный/частичный)",
-  "Тип операции",
-  "Сортируемый товар",
-  "Не сортируемый товар",
-  "Продукты",
-  "Опасный товар",
-  "Закрытая зона",
-  "Крупногабаритный товар",
-  "Ювелирные изделия",
-  "Место",
-  "Вложенность",
-  "Паллет №"
+export const desiredColumnOrder: string[] = [
+  // Полный отчёт: порядок колонок A..AN листа «Лист1» шаблона «Заявка НПП»
+  ...TEMPLATE_COLUMNS.map(col => col.header)
 ]
 
-// Функция обработки значений операций (как в test.py)
-export const processOpColumnValue = (value: any): string | null => {
-  if (value !== null && value !== undefined) {
-    const valueStr = String(value).trim()
-    
-    // Если значение равно 'V', возвращаем '1'
-    if (valueStr === 'V') {
-      return '1'
-    }
-    
-    try {
-      // Пытаемся преобразовать в число
-      const floatValue = parseFloat(valueStr)
-      return String(Math.floor(floatValue)) // Возвращаем целое число
-    } catch {
-      // Если это не число, возвращаем 'V'
-      return 'V'
-    }
-  }
-  
-  return value
-}
+// Значение операции: число -> целое строкой, «V» -> «1», прочий текст -> «V», пусто -> null
+export const processOpColumnValue = normalizeFlagValue
 
 // Для обратной совместимости
 export const getColumnNames = () => uploadColumnMappings
