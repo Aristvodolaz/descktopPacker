@@ -729,6 +729,7 @@ export const createExcelWithTimeInfo = (
   // ВАЖНО: для расчета полного WB отчета сохраняем версию краткого отчета
   // до reorderColumns, чтобы не потерять служебные поля (например, "Количество товаров").
   let dataSet1ForWBFullCalculation: any[] = []
+  let isKorobAssembly = false
   if (dataSet1.length > 0) {
     dataSet1 = removeExcludedColumns(dataSet1) // Удаляем исключенные колонки
     dataSet1 = renameColumns(dataSet1)
@@ -747,22 +748,38 @@ export const createExcelWithTimeInfo = (
 
     // Используем эту версию для calculateWBFullReport (до финального reorder)
     dataSet1ForWBFullCalculation = JSON.parse(JSON.stringify(dataSet1))
+
+    // Коробочная сборка определяется по данным, а не по имени задания: в именах
+    // вроде «OZON НПП от 02.10 Новосибирск №…» слова «короб» нет. Колонка
+    // «Количество товаров» (Kolvo_Tovarov) есть только в Test_MP_Privyazka —
+    // в паллетной выгрузке из Test_MP её нет.
+    isKorobAssembly = dataSet1ForWBFullCalculation.some(
+      (row) =>
+        row['Количество товаров'] !== undefined ||
+        row['Kolvo_Tovarov'] !== undefined
+    )
+    if (isKorobAssembly) {
+      console.log('=== Краткий отчет содержит привязку коробов → заполняем Место/Вложенность/Паллет № ===')
+    }
     
     // Для краткого отчета не добавляем пустые колонки из полного шаблона
     dataSet1 = reorderColumns(dataSet1, { strictTemplate: false }) // Переупорядочиваем колонки
   }
   
-  // Для WB: обрабатываем полный отчет с данными из краткого отчета
-  if (isWB && dataSet1ForWBFullCalculation.length > 0 && dataSet2.length > 0) {
-    // Используем новую функцию для расчета полного отчета ВБ
+  // Коробочная сборка (WB и Ozon НПП): дозаполняем полный отчет данными привязки
+  if ((isWB || isKorobAssembly) && dataSet1ForWBFullCalculation.length > 0 && dataSet2.length > 0) {
+    // Группировка по артикулу/вложенности/паллету: Место = число коробов в группе
     dataSet2 = calculateWBFullReport(dataSet1ForWBFullCalculation, dataSet2)
     
     // После обработки применяем стандартную обработку
     dataSet2 = removeExcludedColumns(dataSet2)
     dataSet2 = renameColumns(dataSet2)
     dataSet2 = filterData(dataSet2)
-    dataSet2 = removeOzonColumnsForWB(dataSet2) // Удаляем колонки Озона для ВБ
-    dataSet2 = reorderColumns(dataSet2, { strictTemplate: true })
+    if (isWB) {
+      dataSet2 = removeOzonColumnsForWB(dataSet2) // Удаляем колонки Озона для ВБ
+    }
+    // Строгий шаблон только для ВБ: у Озона в отчете есть свои колонки (Исходный/Измененный ШК, Itog_MP)
+    dataSet2 = reorderColumns(dataSet2, { strictTemplate: isWB })
   } else if (isWB && dataSet1.length > 0) {
     // Если нет полного отчета, используем старую логику агрегации
     const aggregatedData = aggregateWBDataFromShortReport(dataSet1)
