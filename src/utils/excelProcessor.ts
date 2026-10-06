@@ -1011,7 +1011,7 @@ export const createExcelWithTimeInfo = (
   // Создаем отчет с отклонениями
   // Если isWB = true (включая случай когда Озон с TipPostavki = 1), создаем WB отчет
   if (isWB && sourceData.length > 0) {
-    const wbReport = createWBReport(sourceData)
+    const wbReport = createWBReport(sourceData, sourceDataForPalletSummary)
     if (wbReport.length > 0) {
       // Не вызываем reorderColumns(..., strictTemplate: true): колонки отчёта отклонений
       // не входят в desiredColumnOrder и были бы отброшены (остались бы только поля шаблона).
@@ -1025,7 +1025,7 @@ export const createExcelWithTimeInfo = (
   }
   // Если это Озон с TipPostavki = 0, создаем Озон отчет
   else if (isOzon && !isWB && sourceData.length > 0) {
-    const ozonReport = createOzonReport(sourceData)
+    const ozonReport = createOzonReport(sourceData, sourceDataForPalletSummary)
     if (ozonReport.length > 0) {
       const reorderedOzonReport = reorderColumns(ozonReport, { strictTemplate: false }) // Применяем переупорядочивание колонок
       const cleanedOzonReport = removeFinalReportColumns(reorderedOzonReport) // Удаляем ВП и Название задания
@@ -1037,7 +1037,7 @@ export const createExcelWithTimeInfo = (
   }
   // Если не WB и не Озон, создаем общий отчет отклонений
   else if (!isWB && !isOzon && sourceData.length > 0) {
-    const generalReport = createWBReport(sourceData) // Используем ту же логику
+    const generalReport = createWBReport(sourceData, sourceDataForPalletSummary) // Используем ту же логику
     if (generalReport.length > 0) {
       const reorderedGeneralReport = reorderColumns(generalReport, { strictTemplate: false }) // Применяем переупорядочивание колонок
       const cleanedGeneralReport = removeFinalReportColumns(reorderedGeneralReport) // Удаляем ВП и Название задания
@@ -1187,9 +1187,38 @@ const firstNumericField = (row: any, keys: string[]): number => {
   return 0
 }
 
+/**
+ * Фактически собранное количество по артикулам из привязки (коробочная сборка).
+ * В Test_MP при такой сборке Mesto/Vlozhennost остаются пустыми — вложенность
+ * каждого короба лежит в Test_MP_Privyazka.Kolvo_Tovarov.
+ */
+const sumKolvoTovarovByArtikul = (palletData: any[]): Record<string, number> => {
+  const totals: Record<string, number> = {}
+  if (!palletData || palletData.length === 0) return totals
+
+  for (const row of palletData) {
+    const artikul = row.Artikul ?? row['Артикул']
+    if (artikul === undefined || artikul === null || String(artikul).trim() === '') continue
+
+    const kolvo = Number(row.Kolvo_Tovarov ?? row['Количество товаров'] ?? 0)
+    if (Number.isNaN(kolvo) || kolvo === 0) continue
+
+    const key = String(artikul).trim()
+    totals[key] = (totals[key] || 0) + kolvo
+  }
+
+  return totals
+}
+
 // Функция для расчета отклонений количества сборки
-const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
+const calculateQuantityDiscrepancies = (
+  data: any[],
+  palletData: any[] = []
+): QuantityDiscrepancy[] => {
   if (!data || data.length === 0) return []
+
+  // Факт по коробам — запасной источник, когда Mesto × Вложенность в Test_MP пустые
+  const kolvoByArtikul = sumKolvoTovarovByArtikul(palletData)
 
   // Группируем данные по артикулам
   const groupedByArtikul: { [key: string]: any[] } = {}
@@ -1234,6 +1263,11 @@ const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
       }
     })
 
+    // Коробочная сборка: мест и вложенности в Test_MP нет, берём сумму по коробам из привязки
+    if (totalCalculated === 0 && kolvoByArtikul[artikul] !== undefined) {
+      totalCalculated = kolvoByArtikul[artikul]
+    }
+
     // Рассчитываем отклонение
     const discrepancy = totalCalculated - itogZakaz
     const discrepancyPercentage = itogZakaz > 0 ? Math.round((discrepancy / itogZakaz) * 100) : 0
@@ -1255,8 +1289,8 @@ const calculateQuantityDiscrepancies = (data: any[]): QuantityDiscrepancy[] => {
 }
 
 // Функция для создания отчета WB с отклонениями
-const createWBReport = (data: any[]): any[] => {
-  const discrepancies = calculateQuantityDiscrepancies(data)
+const createWBReport = (data: any[], palletData: any[] = []): any[] => {
+  const discrepancies = calculateQuantityDiscrepancies(data, palletData)
   
   return discrepancies.map(item => ({
     'Артикул': item.artikul,
@@ -1270,8 +1304,8 @@ const createWBReport = (data: any[]): any[] => {
 }
 
 // Функция для создания отчета Озон с отклонениями
-const createOzonReport = (data: any[]): any[] => {
-  const discrepancies = calculateQuantityDiscrepancies(data)
+const createOzonReport = (data: any[], palletData: any[] = []): any[] => {
+  const discrepancies = calculateQuantityDiscrepancies(data, palletData)
   
   return discrepancies.map(item => ({
     'Артикул': item.artikul,
